@@ -10,6 +10,10 @@ import Profile from "./pages/Profile";
 import Checkout from "./pages/Checkout";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import ContactUs from "./pages/ContactUs";
+import AboutUs from "./pages/AboutUs";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsOfService from "./pages/TermsOfService";
 import Drawer from "./components/ui/Drawer";
 import { translations } from "./data/translations";
 import { Trash2, ArrowRight, Bell, Home as HomeIcon, Package, LayoutDashboard, ClipboardList, User, X } from "lucide-react";
@@ -19,44 +23,69 @@ function AppContent() {
     language, cart, updateCartQty, removeFromCart,
     activeDrawer, setActiveDrawer,
     notifications, markAllNotificationsRead,
-    currentUser, logout, getDefaultPage
+    currentUser, logout, performLogout, getDefaultPage
   } = useApp();
 
   const t = translations[language];
   const isRTL = language === "ar";
 
-  const [currentPage, setCurrentPage] = useState(() => {
-    return currentUser ? getDefaultPage(currentUser.role) : "home";
-  });
-  
+  const [currentPage, setCurrentPage] = useState("home");
   const [authModal, setAuthModal] = useState(null); // null, "login", "register"
 
-  // Auth routing guard
+  const navigateTo = (page) => {
+    window.location.hash = `#/${page}`;
+  };
+
+  // Auth & Hash routing logic
   useEffect(() => {
-    if (!currentUser) {
-      const protectedPages = ["dashboard", "orders", "profile", "checkout"];
-      if (protectedPages.includes(currentPage)) {
-        setCurrentPage("home");
-        setAuthModal("login");
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace("#/", "");
+      const validPages = ["home", "products", "dashboard", "orders", "profile", "checkout", "contact", "about", "privacy", "terms"];
+      const page = hash && validPages.includes(hash) ? hash : "home";
+
+      // Auth routing guard
+      if (!currentUser) {
+        const protectedPages = ["dashboard", "orders", "profile", "checkout", "contact"];
+        if (protectedPages.includes(page)) {
+          window.location.hash = "#/home";
+          setAuthModal("login");
+          return;
+        }
+      } else {
+        setAuthModal(null);
+        if (page === "login" || page === "register") {
+          window.location.hash = `#/${getDefaultPage(currentUser.role)}`;
+          return;
+        }
+        if (page === "home" && (currentUser.role === "admin" || currentUser.role === "supplier")) {
+          window.location.hash = "#/dashboard";
+          return;
+        }
       }
-    } else {
-      setAuthModal(null);
-      if (currentPage === "login" || currentPage === "register") {
-        setCurrentPage(getDefaultPage(currentUser.role));
-      }
-    }
-  }, [currentUser, currentPage]);
+
+      setCurrentPage(page);
+    };
+
+    handleHashChange();
+
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, [currentUser]);
 
   // Page render
   const renderPage = () => {
     switch (currentPage) {
-      case "home":     return <Home onNavigate={setCurrentPage} onAuthClick={setAuthModal} />;
+      case "home":     return <Home onNavigate={navigateTo} onAuthClick={setAuthModal} />;
       case "products": return <Products onAuthClick={setAuthModal} />;
-      case "dashboard":return <Dashboard onNavigate={setCurrentPage} />;
+      case "dashboard":return <Dashboard onNavigate={navigateTo} />;
       case "orders":   return <Orders />;
       case "profile":  return <Profile />;
-      case "checkout": return <Checkout onNavigate={setCurrentPage} />;
-      default:         return <Home onNavigate={setCurrentPage} onAuthClick={setAuthModal} />;
+      case "checkout": return <Checkout onNavigate={navigateTo} />;
+      case "contact":  return <ContactUs onAuthClick={setAuthModal} />;
+      case "about":    return <AboutUs />;
+      case "privacy":  return <PrivacyPolicy />;
+      case "terms":    return <TermsOfService />;
+      default:         return <Home onNavigate={navigateTo} onAuthClick={setAuthModal} />;
     }
   };
 
@@ -83,7 +112,9 @@ function AppContent() {
   };
 
   const mobileNavLinks = currentUser ? [
-    { id: "home",      icon: <HomeIcon size={20} />,          label: isRTL ? "الرئيسية" : "Home" },
+    ...(currentUser.role !== "admin" && currentUser.role !== "supplier"
+      ? [{ id: "home",      icon: <HomeIcon size={20} />,          label: isRTL ? "الرئيسية" : "Home" }]
+      : []),
     { id: "products",  icon: <Package size={20} />,           label: isRTL ? "المنتجات" : "Products" },
     { id: "dashboard", icon: <LayoutDashboard size={20} />,   label: isRTL ? "لوحة التحكم" : "Dashboard" },
     { id: "orders",    icon: <ClipboardList size={20} />,     label: isRTL ? "طلباتي" : "Orders" },
@@ -95,7 +126,7 @@ function AppContent() {
 
   return (
     <div className={`app-shell`} dir={isRTL ? "rtl" : "ltr"}>
-      <Header currentPage={currentPage} onNavigate={setCurrentPage} onAuthClick={setAuthModal} />
+      <Header currentPage={currentPage} onNavigate={navigateTo} onAuthClick={setAuthModal} />
       <main style={{ flex: 1 }}>{renderPage()}</main>
       <Footer />
 
@@ -107,22 +138,22 @@ function AppContent() {
           cart.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", color: "var(--text-muted)" }}>
-                <span>{t.subtotal}</span><span>{subtotal.toLocaleString()} EGP</span>
+                <span>{t.subtotal}</span><span>{subtotal.toLocaleString()} {isRTL ? "ج.م" : "EGP"}</span>
               </div>
               {discount > 0 && (
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", color: "var(--success)", fontWeight: 700 }}>
-                  <span>{t.discount}</span><span>-{discount.toLocaleString()} EGP</span>
+                  <span>{t.discount}</span><span>-{discount.toLocaleString()} {isRTL ? "ج.م" : "EGP"}</span>
                 </div>
               )}
               <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 900, fontSize: "1.05rem", color: "var(--primary-600)", borderTop: "1px solid var(--border-color)", paddingTop: 10 }}>
-                <span>{t.total}</span><strong>{total.toLocaleString()} EGP</strong>
+                <span>{t.total}</span><strong>{total.toLocaleString()} {isRTL ? "ج.م" : "EGP"}</strong>
               </div>
               <button
                 className="btn btn-primary"
                 style={{ width: "100%", padding: 13 }}
-                onClick={() => { setCurrentPage("checkout"); setActiveDrawer(null); }}
+                onClick={() => { navigateTo("checkout"); setActiveDrawer(null); }}
               >
-                {t.checkout} <ArrowRight size={18} />
+                {t.checkout} <ArrowRight size={18} className="mirror-rtl" />
               </button>
             </div>
           )
@@ -150,7 +181,7 @@ function AppContent() {
                     {isRTL ? item.product.nameAr : item.product.nameEn}
                   </div>
                   <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginBottom: 8 }}>
-                    {item.product.basePrice} EGP / {isRTL ? "قطعة" : "unit"}
+                    {item.product.basePrice} {isRTL ? "ج.م" : "EGP"} / {isRTL ? "قطعة" : "unit"}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <button style={{ width: 26, height: 26, borderRadius: "var(--radius-sm)", border: "1px solid var(--border-color)", background: "var(--bg-muted)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}
@@ -162,7 +193,7 @@ function AppContent() {
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", justifyContent: "space-between" }}>
                   <span style={{ fontSize: "0.88rem", fontWeight: 700, color: "var(--primary-600)" }}>
-                    {(item.product.basePrice * item.quantity).toLocaleString()} EGP
+                    {(item.product.basePrice * item.quantity).toLocaleString()} {isRTL ? "ج.م" : "EGP"}
                   </span>
                   <button style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", transition: "var(--t-fast)" }}
                     onMouseOver={e => e.currentTarget.style.color = "var(--danger)"}
@@ -226,6 +257,43 @@ function AppContent() {
         </div>
       </Drawer>
 
+      {/* ── LOGOUT CONFIRMATION MODAL ────────────────────── */}
+      {activeDrawer === "logout" && (
+        <div className="modal-bg anim-fade-in" onClick={() => setActiveDrawer(null)}>
+          <div className="modal anim-scale-in" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 400 }}>
+            <div className="modal-head" style={{ borderBottom: "none", paddingBottom: 0 }}>
+              <div className="modal-title">{isRTL ? "تسجيل الخروج" : "Sign Out"}</div>
+              <button className="btn btn-ghost btn-icon btn-icon-sm" onClick={() => setActiveDrawer(null)}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body" style={{ textAlign: "center", padding: "20px 24px", paddingTop: 10 }}>
+              <div style={{ fontSize: "3rem", marginBottom: 16 }}>👋</div>
+              <h3 style={{ marginBottom: 12, fontSize: "1.15rem", fontWeight: 800 }}>
+                {isRTL ? "هل أنت متأكد من تسجيل الخروج؟" : "Are you sure you want to sign out?"}
+              </h3>
+              <p style={{ color: "var(--text-muted)", marginBottom: 20, fontSize: "0.85rem", lineHeight: 1.5 }}>
+                {isRTL
+                  ? "سيتم تسجيل خروجك من النظام وستحتاج إلى تسجيل الدخول مرة أخرى للوصول إلى حسابك."
+                  : "You will be logged out of the system and need to sign in again to access your account."}
+              </p>
+              <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+                <button className="btn btn-secondary" onClick={() => setActiveDrawer(null)} style={{ flex: 1, padding: "10px" }}>
+                  {isRTL ? "إلغاء" : "Cancel"}
+                </button>
+                <button
+                  className="btn btn-primary"
+                  style={{ background: "var(--danger)", border: "none", flex: 1, padding: "10px" }}
+                  onClick={() => performLogout()}
+                >
+                  {isRTL ? "تسجيل خروج" : "Sign Out"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── MOBILE NAV DRAWER ────────────────────── */}
       <Drawer id="mobile-menu" title={t.appName}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -240,7 +308,7 @@ function AppContent() {
                 fontWeight: 600, fontSize: "0.9rem", border: "none", cursor: "pointer",
                 width: "100%", textAlign: "start", transition: "var(--t-fast)"
               }}
-              onClick={() => { setCurrentPage(link.id); setActiveDrawer(null); }}
+              onClick={() => { navigateTo(link.id); setActiveDrawer(null); }}
             >
               {link.icon}
               {link.label}
@@ -250,7 +318,7 @@ function AppContent() {
             <div style={{ borderTop: "1px solid var(--border-color)", marginTop: 8, paddingTop: 8 }}>
               <button
                 style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 16px", borderRadius: "var(--radius-md)", color: "var(--danger)", fontWeight: 600, fontSize: "0.9rem", border: "none", cursor: "pointer", width: "100%", background: "none" }}
-                onClick={() => { logout(); setActiveDrawer(null); }}
+                onClick={() => { setActiveDrawer("logout"); }}
               >
                 🚪 {t.logout}
               </button>
@@ -271,9 +339,9 @@ function AppContent() {
             </div>
             <div style={{ padding: "0 24px 24px" }}>
               {authModal === "login" ? (
-                <Login onNavigate={(p) => { if (p === "register") setAuthModal("register"); else { setCurrentPage(p); setAuthModal(null); } }} />
+                <Login onNavigate={(p) => { if (p === "register") setAuthModal("register"); else { navigateTo(p); setAuthModal(null); } }} />
               ) : (
-                <Register onNavigate={(p) => { if (p === "login") setAuthModal("login"); else { setCurrentPage(p); setAuthModal(null); } }} />
+                <Register onNavigate={(p) => { if (p === "login") setAuthModal("login"); else { navigateTo(p); setAuthModal(null); } }} />
               )}
             </div>
           </div>

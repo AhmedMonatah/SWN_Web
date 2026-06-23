@@ -181,7 +181,7 @@ export default function Profile() {
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginTop: 20 }}>
+        <div style={{ display: "grid", gridTemplateColumns: currentUser?.role === "admin" ? "1fr" : "1fr 1fr", gap: 20, marginTop: 20 }}>
 
           {/* ── Company Information ───────────────── */}
           <div className="card anim-fade-up" style={{ animationDelay: "0.1s" }}>
@@ -256,7 +256,8 @@ export default function Profile() {
           </div>
 
           {/* ── Documents ─────────────────────────── */}
-          <div className="card anim-fade-up" style={{ animationDelay: "0.2s" }}>
+          {currentUser?.role !== "admin" && (
+            <div className="card anim-fade-up" style={{ animationDelay: "0.2s" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <h2 style={{ fontSize: "0.95rem", fontWeight: 800 }}>
                 <Shield size={16} style={{ display: "inline", marginInlineEnd: 6, color: "var(--primary-600)" }} />
@@ -335,6 +336,7 @@ export default function Profile() {
               </div>
             </div>
           </div>
+          )}
         </div>
 
         {/* ── Account Security ───────────────────── */}

@@ -14,7 +14,11 @@ export default function Checkout({ onNavigate }) {
     phone: currentUser?.phone || "",
     shippingAddress: currentUser?.address || "",
     paymentMethod: "bankTransfer",
-    notes: ""
+    notes: "",
+    bankAccountNumber: "",
+    cardNumber: "",
+    cardExpiry: "",
+    cardCvc: ""
   });
   const [placing, setPlacing] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -168,15 +172,43 @@ export default function Checkout({ onNavigate }) {
                   { id: "cod",          labelEn: t.cod,          labelAr: t.cod,          icon: <Package size={20} />,   descEn: "Pay when order arrives",        descAr: "ادفع عند وصول الطلب" },
                   { id: "creditCard",   labelEn: t.creditCard,   labelAr: t.creditCard,   icon: <CreditCard size={20} />, descEn: "Instant confirmation",         descAr: "تأكيد فوري" },
                 ].map(method => (
-                  <label key={method.id} className={`payment-option ${form.paymentMethod === method.id ? "selected" : ""}`}>
-                    <input type="radio" name="paymentMethod" value={method.id} checked={form.paymentMethod === method.id} onChange={handleChange} style={{ display: "none" }} />
-                    <div className="payment-icon">{method.icon}</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700, fontSize: "0.88rem" }}>{isRTL ? method.labelAr : method.labelEn}</div>
-                      <div style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>{isRTL ? method.descAr : method.descEn}</div>
-                    </div>
-                    <div className={`payment-check ${form.paymentMethod === method.id ? "checked" : ""}`} />
-                  </label>
+                  <div key={method.id} style={{ display: "flex", flexDirection: "column", gap: 8, border: "1.5px solid var(--border-color)", borderRadius: "var(--radius-lg)", padding: 12, background: form.paymentMethod === method.id ? "var(--primary-50)" : "transparent" }}>
+                    <label className={`payment-option ${form.paymentMethod === method.id ? "selected" : ""}`} style={{ border: "none", padding: 0, background: "transparent" }}>
+                      <input type="radio" name="paymentMethod" value={method.id} checked={form.paymentMethod === method.id} onChange={handleChange} style={{ display: "none" }} />
+                      <div className="payment-icon">{method.icon}</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 700, fontSize: "0.88rem" }}>{isRTL ? method.labelAr : method.labelEn}</div>
+                        <div style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>{isRTL ? method.descAr : method.descEn}</div>
+                      </div>
+                      <div className={`payment-check ${form.paymentMethod === method.id ? "checked" : ""}`} />
+                    </label>
+
+                    {form.paymentMethod === method.id && method.id === "bankTransfer" && (
+                      <div className="form-group anim-fade-in" style={{ marginTop: 8 }}>
+                        <label className="form-label" style={{ fontSize: "0.72rem" }}>{isRTL ? "رقم الحساب البنكي / الرقم المرجعي للتحويل *" : "Bank Account Number / Reference Number *"}</label>
+                        <input className="form-input" name="bankAccountNumber" value={form.bankAccountNumber} onChange={handleChange} placeholder="EG03938473847293847..." required style={{ background: "var(--bg-surface)" }} />
+                      </div>
+                    )}
+
+                    {form.paymentMethod === method.id && method.id === "creditCard" && (
+                      <div className="anim-fade-in" style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
+                        <div className="form-group">
+                          <label className="form-label" style={{ fontSize: "0.72rem" }}>{isRTL ? "رقم البطاقة *" : "Card Number *"}</label>
+                          <input className="form-input" name="cardNumber" value={form.cardNumber} onChange={handleChange} placeholder="4242 •••• •••• ••••" maxLength={19} required style={{ background: "var(--bg-surface)" }} />
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                          <div className="form-group">
+                            <label className="form-label" style={{ fontSize: "0.72rem" }}>{isRTL ? "تاريخ الانتهاء *" : "Expiry Date *"}</label>
+                            <input className="form-input" name="cardExpiry" value={form.cardExpiry} onChange={handleChange} placeholder="MM/YY" maxLength={5} required style={{ background: "var(--bg-surface)" }} />
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label" style={{ fontSize: "0.72rem" }}>{isRTL ? "رمز التحقق CVC *" : "CVC *"}</label>
+                            <input className="form-input" name="cardCvc" value={form.cardCvc} onChange={handleChange} placeholder="•••" maxLength={4} required style={{ background: "var(--bg-surface)" }} />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             </div>
@@ -198,10 +230,10 @@ export default function Checkout({ onNavigate }) {
                       <div style={{ fontSize: "0.82rem", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {isRTL ? product.nameAr : product.nameEn}
                       </div>
-                      <div style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>{quantity} × {product.basePrice} EGP</div>
+                      <div style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>{quantity} × {product.basePrice} {isRTL ? "ج.م" : "EGP"}</div>
                     </div>
                     <div style={{ fontSize: "0.88rem", fontWeight: 700, color: "var(--primary-600)", flexShrink: 0 }}>
-                      {(product.basePrice * quantity).toLocaleString()} EGP
+                      {(product.basePrice * quantity).toLocaleString()} {isRTL ? "ج.م" : "EGP"}
                     </div>
                   </div>
                 ))}
@@ -210,19 +242,19 @@ export default function Checkout({ onNavigate }) {
               {/* Totals */}
               <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingTop: 8 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", color: "var(--text-muted)" }}>
-                  <span>{t.subtotal}</span><span>{subtotal.toLocaleString()} EGP</span>
+                  <span>{t.subtotal}</span><span>{subtotal.toLocaleString()} {isRTL ? "ج.م" : "EGP"}</span>
                 </div>
                 {discount > 0 && (
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", color: "var(--success)", fontWeight: 700 }}>
-                    <span>{t.discount}</span><span>-{discount.toLocaleString()} EGP</span>
+                    <span>{t.discount}</span><span>-{discount.toLocaleString()} {isRTL ? "ج.م" : "EGP"}</span>
                   </div>
                 )}
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", color: "var(--text-muted)" }}>
                   <span>{t.shipping}</span>
-                  <span>{shipping === 0 ? (isRTL ? "مجاني 🎉" : "Free 🎉") : `${shipping.toLocaleString()} EGP`}</span>
+                  <span>{shipping === 0 ? (isRTL ? "مجاني 🎉" : "Free 🎉") : `${shipping.toLocaleString()} ${isRTL ? "ج.م" : "EGP"}`}</span>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "1.1rem", fontWeight: 900, color: "var(--primary-600)", borderTop: "1px solid var(--border-color)", paddingTop: 10, marginTop: 4 }}>
-                  <span>{t.total}</span><span>{total.toLocaleString()} EGP</span>
+                  <span>{t.total}</span><span>{total.toLocaleString()} {isRTL ? "ج.م" : "EGP"}</span>
                 </div>
               </div>
 
@@ -236,7 +268,13 @@ export default function Checkout({ onNavigate }) {
                 className="btn btn-primary btn-xl w-full"
                 style={{ marginTop: 16 }}
                 onClick={handlePlaceOrder}
-                disabled={placing || !form.phone || !form.shippingAddress}
+                disabled={
+                  placing ||
+                  !form.phone ||
+                  !form.shippingAddress ||
+                  (form.paymentMethod === "bankTransfer" && !form.bankAccountNumber.trim()) ||
+                  (form.paymentMethod === "creditCard" && (!form.cardNumber.trim() || !form.cardExpiry.trim() || !form.cardCvc.trim()))
+                }
               >
                 {placing ? (
                   <span className="btn-spinner" style={{ width: 20, height: 20 }} />

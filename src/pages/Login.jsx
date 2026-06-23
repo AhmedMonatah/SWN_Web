@@ -119,7 +119,7 @@ export default function Login({ onNavigate }) {
               {loading ? (
                 <span className="btn-spinner" />
               ) : (
-                <>{L("Sign In", "تسجيل الدخول")} <ArrowRight size={17} style={{ marginInlineStart: 4 }} /></>
+                <>{L("Sign In", "تسجيل الدخول")} <ArrowRight size={17} className="mirror-rtl" style={{ marginInlineStart: 4 }} /></>
               )}
             </button>
           </form>
@@ -130,6 +130,8 @@ export default function Login({ onNavigate }) {
               {L("Create one", "إنشاء حساب")}
             </button>
           </p>
+
+
         </div>
       </div>
 

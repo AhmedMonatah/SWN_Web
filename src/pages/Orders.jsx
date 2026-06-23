@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useApp } from "../context/AppContext";
 import { translations } from "../data/translations";
 import { Search, ChevronDown, Check, Truck, Package, Clock, XCircle, Eye } from "lucide-react";
+import Drawer from "../components/ui/Drawer";
 
 const STATUS_CONFIG = {
   pending:   { color: "status-pending",   icon: <Clock size={14} />,    steps: 0 },
@@ -21,7 +22,7 @@ const TIMELINE_STEPS = [
 ];
 
 export default function Orders() {
-  const { language, currentUser, orders, updateOrderStatus } = useApp();
+  const { language, currentUser, orders, updateOrderStatus, setActiveDrawer } = useApp();
   const t = translations[language];
   const isRTL = language === "ar";
 
@@ -104,7 +105,7 @@ export default function Orders() {
             </p>
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }} className="stagger-children">
+          <div style={{ display: "flex", flexDirection: "column", gap: 20, maxHeight: "70vh", overflowY: "auto", paddingRight: 8, paddingBottom: 20 }} className="stagger-children">
             {filtered.map((order, i) => (
               <div
                 key={order.id}
@@ -127,11 +128,10 @@ export default function Orders() {
                     </span>
                     <button
                       className="btn btn-ghost btn-sm"
-                      onClick={() => setSelectedOrder(selectedOrder?.id === order.id ? null : order)}
+                      onClick={() => { setSelectedOrder(order); setActiveDrawer("order-details"); }}
                     >
                       <Eye size={15} />
                       {isRTL ? "التفاصيل" : "Details"}
-                      <ChevronDown size={14} style={{ transform: selectedOrder?.id === order.id ? "rotate(180deg)" : "none", transition: "0.2s" }} />
                     </button>
                   </div>
                 </div>
@@ -153,83 +153,86 @@ export default function Orders() {
                   </div>
                   <div style={{ color: "var(--text-muted)" }}>·</div>
                   <div style={{ fontWeight: 800, color: "var(--primary-600)", fontSize: "0.95rem" }}>
-                    EGP {order.totalAmount?.toLocaleString()}
+                    {order.totalAmount?.toLocaleString()} {isRTL ? "ج.م" : "EGP"}
                   </div>
                 </div>
 
-                {/* Expanded Detail */}
-                {selectedOrder?.id === order.id && (
-                  <div className="order-detail anim-fade-down" style={{ marginTop: 16, borderTop: "1px solid var(--border-color)", paddingTop: 16 }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-                      {/* Timeline */}
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: "0.85rem", marginBottom: 14 }}>{t.orderTimeline}</div>
-                        <div className="order-timeline">
-                          {TIMELINE_STEPS.map((step, si) => {
-                            const stepStatus = getStepStatus(step.statusKey, order.status);
-                            const isLast = si === TIMELINE_STEPS.length - 1;
-                            const timelineEntry = order.timeline?.find(t => t.status === step.statusKey);
-                            return (
-                              <div key={step.statusKey} className="timeline-item">
-                                {!isLast && <div className={`timeline-line ${stepStatus === "done" ? "done" : ""}`} />}
-                                <div className={`timeline-dot ${stepStatus}`}>{step.iconEn}</div>
-                                <div className="timeline-content">
-                                  <div className="timeline-title">{isRTL ? step.labelAr : step.labelEn}</div>
-                                  {timelineEntry && (
-                                    <div className="timeline-time">
-                                      {new Date(timelineEntry.time).toLocaleString(isRTL ? "ar-EG" : "en-US", { dateStyle: "short", timeStyle: "short" })}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Order Items + Actions */}
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: "0.85rem", marginBottom: 12 }}>
-                          {isRTL ? "تفاصيل المنتجات" : "Order Items"}
-                        </div>
-                        {order.items?.map((item, ii) => (
-                          <div key={ii} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--border-color)", fontSize: "0.82rem" }}>
-                            <div>
-                              <div style={{ fontWeight: 600 }}>{isRTL ? item.nameAr || item.nameEn : item.nameEn}</div>
-                              <div style={{ color: "var(--text-muted)" }}>{item.quantity} × {item.price} EGP</div>
-                            </div>
-                            <div style={{ fontWeight: 700, color: "var(--primary-600)" }}>
-                              EGP {(item.quantity * item.price).toLocaleString()}
-                            </div>
-                          </div>
-                        ))}
-
-                        <div style={{ marginTop: 12, padding: "10px 12px", background: "var(--bg-muted)", borderRadius: "var(--radius-md)", display: "flex", justifyContent: "space-between" }}>
-                          <span style={{ fontWeight: 600, fontSize: "0.85rem" }}>{isRTL ? "الإجمالي" : "Total"}</span>
-                          <span style={{ fontWeight: 900, color: "var(--primary-600)" }}>EGP {order.totalAmount?.toLocaleString()}</span>
-                        </div>
-
-                        {/* Manage actions — for sellers or admin */}
-                        {((canManage && order.sellerId === currentUser?.id) || currentUser?.role === "admin") && nextStatus(order.status) && (
-                          <div style={{ marginTop: 12 }}>
-                            <button
-                              className="btn btn-primary w-full"
-                              onClick={() => { updateOrderStatus(order.id, nextStatus(order.status)); setSelectedOrder({ ...order, status: nextStatus(order.status) }); }}
-                              style={{ padding: "10px", fontSize: "0.85rem" }}
-                            >
-                              {isRTL ? `تحديث إلى: ${STATUS_LABELS_AR[nextStatus(order.status)]}` : `Update to: ${STATUS_LABELS_EN[nextStatus(order.status)]}`}
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
             ))}
           </div>
         )}
       </div>
+
+      <Drawer
+        id="order-details"
+        title={selectedOrder ? (isRTL ? `تفاصيل الطلب #${selectedOrder.id.split("-").pop()}` : `Order Details #${selectedOrder.id.split("-").pop()}`) : ""}
+      >
+        {selectedOrder && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            {/* Timeline */}
+            <div>
+              <div style={{ fontWeight: 700, fontSize: "0.85rem", marginBottom: 14 }}>{t.orderTimeline}</div>
+              <div className="order-timeline">
+                {TIMELINE_STEPS.map((step, si) => {
+                  const stepStatus = getStepStatus(step.statusKey, selectedOrder.status);
+                  const isLast = si === TIMELINE_STEPS.length - 1;
+                  const timelineEntry = selectedOrder.timeline?.find(t => t.status === step.statusKey);
+                  return (
+                    <div key={step.statusKey} className="timeline-item">
+                      {!isLast && <div className={`timeline-line ${stepStatus === "done" ? "done" : ""}`} />}
+                      <div className={`timeline-dot ${stepStatus}`}>{step.iconEn}</div>
+                      <div className="timeline-content">
+                        <div className="timeline-title">{isRTL ? step.labelAr : step.labelEn}</div>
+                        {timelineEntry && (
+                          <div className="timeline-time">
+                            {new Date(timelineEntry.time).toLocaleString(isRTL ? "ar-EG" : "en-US", { dateStyle: "short", timeStyle: "short" })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Order Items + Actions */}
+            <div>
+              <div style={{ fontWeight: 700, fontSize: "0.85rem", marginBottom: 12 }}>
+                {isRTL ? "تفاصيل المنتجات" : "Order Items"}
+              </div>
+              {selectedOrder.items?.map((item, ii) => (
+                <div key={ii} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--border-color)", fontSize: "0.82rem" }}>
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{isRTL ? item.nameAr || item.nameEn : item.nameEn}</div>
+                    <div style={{ color: "var(--text-muted)" }}>{item.quantity} × {item.price} {isRTL ? "ج.م" : "EGP"}</div>
+                  </div>
+                  <div style={{ fontWeight: 700, color: "var(--primary-600)" }}>
+                    {(item.quantity * item.price).toLocaleString()} {isRTL ? "ج.م" : "EGP"}
+                  </div>
+                </div>
+              ))}
+
+              <div style={{ marginTop: 12, padding: "10px 12px", background: "var(--bg-muted)", borderRadius: "var(--radius-md)", display: "flex", justifyContent: "space-between" }}>
+                <span style={{ fontWeight: 600, fontSize: "0.85rem" }}>{isRTL ? "الإجمالي" : "Total"}</span>
+                <span style={{ fontWeight: 900, color: "var(--primary-600)" }}>{selectedOrder.totalAmount?.toLocaleString()} {isRTL ? "ج.م" : "EGP"}</span>
+              </div>
+
+              {/* Manage actions — for sellers or admin */}
+              {((canManage && selectedOrder.sellerId === currentUser?.id) || currentUser?.role === "admin") && nextStatus(selectedOrder.status) && (
+                <div style={{ marginTop: 24 }}>
+                  <button
+                    className="btn btn-primary w-full"
+                    onClick={() => { updateOrderStatus(selectedOrder.id, nextStatus(selectedOrder.status)); setSelectedOrder({ ...selectedOrder, status: nextStatus(selectedOrder.status) }); }}
+                    style={{ padding: "12px", fontSize: "0.9rem" }}
+                  >
+                    {isRTL ? `تحديث إلى: ${STATUS_LABELS_AR[nextStatus(selectedOrder.status)]}` : `Update to: ${STATUS_LABELS_EN[nextStatus(selectedOrder.status)]}`}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </Drawer>
 
       <style>{`
         .order-card {
@@ -242,7 +245,8 @@ export default function Orders() {
         }
         .order-card:hover { box-shadow: var(--shadow-md); border-color: var(--primary-200); }
         .order-id-badge {
-          width: 40px; height: 40px;
+          min-width: 40px; height: 40px;
+          padding: 0 10px;
           border-radius: var(--radius-md);
           background: var(--primary-50);
           color: var(--primary-700);
@@ -253,6 +257,22 @@ export default function Orders() {
           text-align: center;
           line-height: 1.2;
           flex-shrink: 0;
+          white-space: nowrap;
+        }
+        .status-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 4px 10px;
+          border-radius: var(--radius-full);
+          font-size: 0.72rem;
+          font-weight: 700;
+          background: var(--warning-bg, #fef3c7);
+          color: var(--warning, #d97706);
+        }
+        .status-badge.status-delivered {
+          background: var(--success-bg, #dcfce7);
+          color: var(--success, #16a34a);
         }
         @media (max-width: 640px) {
           .order-detail > div { grid-template-columns: 1fr !important; }

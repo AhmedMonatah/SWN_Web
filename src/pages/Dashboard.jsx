@@ -37,7 +37,10 @@ export default function Dashboard({ onNavigate }) {
     users,
     loadUsers,
     approveDocument,
-    rejectDocument
+    rejectDocument,
+    deleteUser,
+    contactMessages,
+    replyContactMessage
   } = useApp();
 
   const isRTL = language === "ar";
@@ -47,6 +50,13 @@ export default function Dashboard({ onNavigate }) {
   const [tab, setTab] = useState("overview");
   const [saving, setSaving] = useState(false);
   const [viewingDoc, setViewingDoc] = useState(null); // { user, docKey, docData }
+  const [rejectingProduct, setRejectingProduct] = useState(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [viewingProduct, setViewingProduct] = useState(null);
+  const [deletingUser, setDeletingUser] = useState(null);
+  const [hoveredIndex, setHoveredIndex] = useState(null);
+  const [replyingMessage, setReplyingMessage] = useState(null);
+  const [replyText, setReplyText] = useState("");
 
   const [form, setForm] = useState({
     nameEn: "", nameAr: "", descriptionEn: "", descriptionAr: "",
@@ -78,7 +88,7 @@ export default function Dashboard({ onNavigate }) {
     .reduce((s, o) => s + (o.totalAmount || 0), 0);
 
   const spent = orders
-    .filter((o) => o.buyerId === currentUser?.id)
+    .filter((o) => o.buyerId === currentUser?.id && o.status !== "cancelled")
     .reduce((s, o) => s + (o.totalAmount || 0), 0);
 
   const pendingOrdersCount = orders.filter((o) => o.status === "pending").length;
@@ -104,20 +114,20 @@ export default function Dashboard({ onNavigate }) {
       ]
     : isSupplier
     ? [
-        { label: L("Total Revenue", "إجمالي المبيعات"), value: `${revenue.toLocaleString()} EGP`, icon: "💰", color: "green" },
+        { label: L("Total Revenue", "إجمالي المبيعات"), value: `${revenue.toLocaleString()} ${isRTL ? "ج.م" : "EGP"}`, icon: "💰", color: "green" },
         { label: L("My Products", "منتجاتي"), value: myProducts.length, icon: "📦", color: "blue" },
         { label: L("Pending Orders", "الطلبات المعلقة"), value: pendingOrdersCount, icon: "⏳", color: "amber" },
         { label: L("Low Stock", "مخزون منخفض"), value: lowStock.length, icon: "⚠️", color: "purple" }
       ]
     : isWholesaler
     ? [
-        { label: L("Sales Revenue", "مبيعات الجملة"), value: `${revenue.toLocaleString()} EGP`, icon: "💰", color: "green" },
+        { label: L("Sales Revenue", "مبيعات الجملة"), value: `${revenue.toLocaleString()} ${isRTL ? "ج.م" : "EGP"}`, icon: "💰", color: "green" },
         { label: L("My Products", "منتجاتي للبيع"), value: myProducts.length, icon: "📦", color: "blue" },
-        { label: L("Total Purchased", "مشترياتي بالجملة"), value: `${spent.toLocaleString()} EGP`, icon: "🛒", color: "purple" },
+        { label: L("Total Purchased", "مشترياتي بالجملة"), value: `${spent.toLocaleString()} ${isRTL ? "ج.م" : "EGP"}`, icon: "🛒", color: "purple" },
         { label: L("Pending Orders", "الطلبات المعلقة"), value: pendingOrdersCount, icon: "⏳", color: "amber" }
       ]
     : [ // Retailer
-        { label: L("Total Purchased", "إجمالي مشترياتي"), value: `${spent.toLocaleString()} EGP`, icon: "💰", color: "green" },
+        { label: L("Total Purchased", "إجمالي مشترياتي"), value: `${spent.toLocaleString()} ${isRTL ? "ج.م" : "EGP"}`, icon: "💰", color: "green" },
         { label: L("Orders Placed", "الطلبات المقدمة"), value: orders.filter((o) => o.buyerId === currentUser?.id).length, icon: "📋", color: "blue" },
         { label: L("Pending Delivery", "قيد التوصيل"), value: orders.filter((o) => o.buyerId === currentUser?.id && o.status !== "delivered" && o.status !== "cancelled").length, icon: "🚚", color: "amber" }
       ];
@@ -125,11 +135,14 @@ export default function Dashboard({ onNavigate }) {
   const canAddProduct = isSupplier || isWholesaler;
   const recentOrders = orders.slice(0, 5);
 
+  const pendingMsgsCount = contactMessages.filter(m => m.status === "pending").length;
+
   const TABS = isAdmin
     ? [
         { id: "overview", label: L("Overview", "نظرة عامة") },
         { id: "approvals", label: L(`Product Approvals (${pendingProducts.length})`, `مراجعة المنتجات (${pendingProducts.length})`) },
-        { id: "users", label: L(`Document Verification (${pendingDocsCount})`, `توثيق الحسابات (${pendingDocsCount})`) }
+        { id: "users", label: L(`Document Verification (${pendingDocsCount})`, `توثيق الحسابات (${pendingDocsCount})`) },
+        { id: "messages", label: L(`Contact Inquiries (${pendingMsgsCount})`, `طلبات التواصل (${pendingMsgsCount})`) }
       ]
     : canAddProduct
     ? [
@@ -416,66 +429,134 @@ export default function Dashboard({ onNavigate }) {
                       📊 {L("No delivered sales recorded yet to display graph analytics.", "لا توجد مبيعات مكتملة مسجلة بعد لعرض التحليلات البيانية.")}
                     </div>
                   ) : (
-                    <div className="svg-chart-container" style={{ width: "100%", overflowX: "auto" }}>
-                      <svg width="100%" height="180" viewBox="0 0 400 160" preserveAspectRatio="none" style={{ minWidth: 360 }}>
-                        <defs>
-                          <linearGradient id="sales-gradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="var(--brand)" stopOpacity="0.25" />
-                            <stop offset="100%" stopColor="var(--brand)" stopOpacity="0.0" />
-                          </linearGradient>
-                          <linearGradient id="profit-gradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="var(--success)" stopOpacity="0.25" />
-                            <stop offset="100%" stopColor="var(--success)" stopOpacity="0.0" />
-                          </linearGradient>
-                        </defs>
-                        {/* Horizontal Grid lines */}
-                        {[0, 0.25, 0.5, 0.75, 1].map((pct, idx) => {
-                          const yVal = 20 + 110 - (pct * 110);
-                          const labelVal = Math.round(pct * maxSalesVal);
-                          return (
-                            <g key={idx} style={{ opacity: 0.4 }}>
-                              <line x1="45" y1={yVal} x2="385" y2={yVal} stroke="var(--border)" strokeWidth="1" strokeDasharray="3 3" />
-                              <text x="38" y={yVal} textAnchor="end" dominantBaseline="middle" style={{ fontSize: "0.55rem", fill: "var(--text-3)", fontWeight: 700 }}>
-                                {labelVal >= 1000 ? `${(labelVal/1000).toFixed(0)}k` : labelVal}
-                              </text>
-                            </g>
-                          );
-                        })}
-                        {/* Smooth Area Fills */}
-                        {(() => {
-                          const chartWidth = 340;
-                          const chartHeight = 110;
-                          const paddingX = 45;
-                          const paddingY = 20;
-                          const points = graphData.map((d, i) => {
-                            const x = paddingX + (i * (chartWidth / (graphData.length - 1)));
-                            const y = paddingY + chartHeight - ((d.sales / maxSalesVal) * chartHeight);
-                            const profitY = paddingY + chartHeight - ((d.profit / maxSalesVal) * chartHeight);
-                            return { x, y, profitY };
-                          });
-                          const salesPathD = points.reduce((acc, p, i) => acc + `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`, "");
-                          const salesAreaD = salesPathD + ` L ${points[points.length - 1].x} ${paddingY + chartHeight} L ${points[0].x} ${paddingY + chartHeight} Z`;
-                          const profitPathD = points.reduce((acc, p, i) => acc + `${i === 0 ? "M" : "L"} ${p.x} ${p.profitY}`, "");
-                          const profitAreaD = profitPathD + ` L ${points[points.length - 1].x} ${paddingY + chartHeight} L ${points[0].x} ${paddingY + chartHeight} Z`;
-                          return (
-                            <>
-                              <path d={salesAreaD} fill="url(#sales-gradient)" />
-                              <path d={profitAreaD} fill="url(#profit-gradient)" />
-                              <path d={salesPathD} stroke="var(--brand)" strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                              <path d={profitPathD} stroke="var(--success)" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                              {points.map((p, i) => (
-                                <g key={i}>
-                                  <circle cx={p.x} cy={p.y} r="4" fill="var(--brand)" stroke="#ffffff" strokeWidth="2.5" />
-                                  <circle cx={p.x} cy={p.profitY} r="4" fill="var(--success)" stroke="#ffffff" strokeWidth="2.5" />
-                                  <text x={p.x} y={148} textAnchor="middle" style={{ fontSize: "0.62rem", fill: "var(--text-3)", fontWeight: 700 }}>
-                                    {graphData[i].name}
-                                  </text>
-                                </g>
-                              ))}
-                            </>
-                          );
-                        })()}
-                      </svg>
+                    <div className="svg-chart-container" style={{ width: "100%", overflowX: "auto", position: "relative" }} onMouseLeave={() => setHoveredIndex(null)}>
+                      {(() => {
+                        const chartWidth = 340;
+                        const chartHeight = 110;
+                        const paddingX = 45;
+                        const paddingY = 20;
+                        const points = graphData.map((d, i) => {
+                          const x = paddingX + (i * (chartWidth / (graphData.length - 1)));
+                          const y = paddingY + chartHeight - ((d.sales / maxSalesVal) * chartHeight);
+                          const profitY = paddingY + chartHeight - ((d.profit / maxSalesVal) * chartHeight);
+                          return { x, y, profitY };
+                        });
+                        return (
+                          <>
+                            <svg width="100%" height="180" viewBox="0 0 400 160" preserveAspectRatio="none" style={{ minWidth: 360 }}>
+                              <defs>
+                                <linearGradient id="sales-gradient" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="0%" stopColor="var(--brand)" stopOpacity="0.25" />
+                                  <stop offset="100%" stopColor="var(--brand)" stopOpacity="0.0" />
+                                </linearGradient>
+                                <linearGradient id="profit-gradient" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="0%" stopColor="var(--success)" stopOpacity="0.25" />
+                                  <stop offset="100%" stopColor="var(--success)" stopOpacity="0.0" />
+                                </linearGradient>
+                              </defs>
+                              {/* Horizontal Grid lines */}
+                              {[0, 0.25, 0.5, 0.75, 1].map((pct, idx) => {
+                                const yVal = 20 + 110 - (pct * 110);
+                                const labelVal = Math.round(pct * maxSalesVal);
+                                return (
+                                  <g key={idx} style={{ opacity: 0.4 }}>
+                                    <line x1="45" y1={yVal} x2="385" y2={yVal} stroke="var(--border)" strokeWidth="1" strokeDasharray="3 3" />
+                                    <text x="38" y={yVal} textAnchor="end" dominantBaseline="middle" style={{ fontSize: "0.55rem", fill: "var(--text-3)", fontWeight: 700 }}>
+                                      {labelVal >= 1000 ? `${(labelVal/1000).toFixed(0)}k` : labelVal}
+                                    </text>
+                                  </g>
+                                );
+                              })}
+
+                              {/* Vertical Line Cursor on Hover */}
+                              {hoveredIndex !== null && points[hoveredIndex] && (
+                                <line x1={points[hoveredIndex].x} y1="20" x2={points[hoveredIndex].x} y2="130" stroke="var(--primary-300)" strokeWidth="1.5" strokeDasharray="3 3" style={{ opacity: 0.8 }} />
+                              )}
+
+                              {/* Smooth Area Fills */}
+                              {(() => {
+                                const salesPathD = points.reduce((acc, p, i) => acc + `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`, "");
+                                const salesAreaD = salesPathD + ` L ${points[points.length - 1].x} ${paddingY + chartHeight} L ${points[0].x} ${paddingY + chartHeight} Z`;
+                                const profitPathD = points.reduce((acc, p, i) => acc + `${i === 0 ? "M" : "L"} ${p.x} ${p.profitY}`, "");
+                                const profitAreaD = profitPathD + ` L ${points[points.length - 1].x} ${paddingY + chartHeight} L ${points[0].x} ${paddingY + chartHeight} Z`;
+                                return (
+                                  <>
+                                    <path d={salesAreaD} fill="url(#sales-gradient)" />
+                                    <path d={profitAreaD} fill="url(#profit-gradient)" />
+                                    <path d={salesPathD} stroke="var(--brand)" strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                                    <path d={profitPathD} stroke="var(--success)" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                                  </>
+                                );
+                              })()}
+
+                              {/* Render Circles */}
+                              {points.map((p, i) => {
+                                const isHovered = hoveredIndex === i;
+                                return (
+                                  <g key={i}>
+                                    <circle cx={p.x} cy={p.y} r={isHovered ? "6" : "4"} fill="var(--brand)" stroke="#ffffff" strokeWidth="2.5" style={{ transition: "all 0.15s ease", filter: isHovered ? "drop-shadow(0 0 4px var(--brand))" : "none" }} />
+                                    <circle cx={p.x} cy={p.profitY} r={isHovered ? "6" : "4"} fill="var(--success)" stroke="#ffffff" strokeWidth="2.5" style={{ transition: "all 0.15s ease", filter: isHovered ? "drop-shadow(0 0 4px var(--success))" : "none" }} />
+                                    <text x={p.x} y={148} textAnchor="middle" style={{ fontSize: "0.62rem", fill: isHovered ? "var(--text-1)" : "var(--text-3)", fontWeight: 700 }}>
+                                      {graphData[i].name}
+                                    </text>
+                                  </g>
+                                );
+                              })}
+
+                              {/* Hover Rectangles */}
+                              {points.map((p, i) => {
+                                const rectWidth = chartWidth / (graphData.length - 1);
+                                const rectX = p.x - rectWidth / 2;
+                                return (
+                                  <rect
+                                    key={`hover-${i}`}
+                                    x={rectX}
+                                    y="10"
+                                    width={rectWidth}
+                                    height="130"
+                                    fill="transparent"
+                                    style={{ cursor: "pointer" }}
+                                    onMouseEnter={() => setHoveredIndex(i)}
+                                  />
+                                );
+                              })}
+                            </svg>
+
+                            {/* Floating Glassmorphic Tooltip */}
+                            {hoveredIndex !== null && points[hoveredIndex] && (
+                              <div style={{
+                                position: "absolute",
+                                top: "10px",
+                                left: isRTL ? undefined : `${points[hoveredIndex].x}px`,
+                                right: isRTL ? `${400 - points[hoveredIndex].x}px` : undefined,
+                                transform: "translateX(-50%)",
+                                background: "var(--bg-card)",
+                                border: "1px solid var(--border)",
+                                borderRadius: "var(--radius-md)",
+                                padding: "8px 12px",
+                                boxShadow: "var(--shadow-md)",
+                                zIndex: 100,
+                                pointerEvents: "none",
+                                minWidth: 130,
+                                fontSize: "0.72rem",
+                                animation: "fadeInUp 0.15s ease-out both"
+                              }}>
+                                <div style={{ fontWeight: 800, marginBottom: 5, color: "var(--text-1)", borderBottom: "1px solid var(--border)", paddingBottom: 4 }}>
+                                  {graphData[hoveredIndex].name}
+                                </div>
+                                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, color: "var(--text-2)", marginBottom: 2 }}>
+                                  <span>{L("Sales:", "المبيعات:")}</span>
+                                  <strong style={{ color: "var(--brand)" }}>{graphData[hoveredIndex].sales.toLocaleString()} {isRTL ? "ج.م" : "EGP"}</strong>
+                                </div>
+                                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, color: "var(--text-2)" }}>
+                                  <span>{L("Profit:", "الربح:")}</span>
+                                  <strong style={{ color: "var(--success)" }}>{graphData[hoveredIndex].profit.toLocaleString()} {isRTL ? "ج.م" : "EGP"}</strong>
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>
@@ -570,7 +651,7 @@ export default function Dashboard({ onNavigate }) {
                           {L(STATUS_EN[o.status], STATUS_AR[o.status])}
                         </span>
                         <div style={{ fontSize: ".85rem", fontWeight: 700, color: "var(--text-1)" }}>
-                          {o.totalAmount?.toLocaleString()} EGP
+                          {o.totalAmount?.toLocaleString()} {isRTL ? "ج.م" : "EGP"}
                         </div>
                       </div>
                     ))}
@@ -616,7 +697,7 @@ export default function Dashboard({ onNavigate }) {
                             {getProductStatusBadge(p.status)}
                           </div>
                           <div style={{ fontSize: ".82rem", fontWeight: 700, color: "var(--brand)", flexShrink: 0 }}>
-                            {p.basePrice} EGP
+                            {p.basePrice} {isRTL ? "ج.م" : "EGP"}
                           </div>
                           <button className="btn btn-ghost btn-icon-sm" onClick={() => deleteProduct(p.id)} title="Delete">
                             <Trash2 size={13} style={{ color: "var(--danger)" }} />
@@ -754,7 +835,7 @@ export default function Dashboard({ onNavigate }) {
                           </span>
                         </td>
                         <td style={{ fontWeight: 700, fontSize: ".85rem" }}>
-                          {p.basePrice?.toLocaleString()} EGP
+                          {p.basePrice?.toLocaleString()} {isRTL ? "ج.م" : "EGP"}
                         </td>
                         <td>
                           <span style={{ color: p.quantity < 100 ? "var(--danger)" : "var(--success)", fontWeight: 700, fontSize: ".82rem" }}>
@@ -811,18 +892,21 @@ export default function Dashboard({ onNavigate }) {
                           <span>{L("Category:", "الفئة:")} <strong>{L(CAT_LABEL_EN[p.category], CAT_LABEL_AR[p.category])}</strong></span>
                         </div>
                       </div>
+                      <button className="btn btn-ghost btn-icon btn-icon-sm" onClick={() => setViewingProduct(p)} title={L("View Details", "عرض التفاصيل")} style={{ padding: 4 }}>
+                        <Eye size={15} style={{ color: "var(--brand)" }} />
+                      </button>
                     </div>
                     <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
                       <div style={{ textAlign: "end" }}>
                         <div style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>{L("Price / MOQ", "السعر / الحد الأدنى")}</div>
-                        <div style={{ fontWeight: 800, fontSize: "0.95rem", color: "var(--brand)", marginTop: 2 }}>{p.basePrice} EGP</div>
+                        <div style={{ fontWeight: 800, fontSize: "0.95rem", color: "var(--brand)", marginTop: 2 }}>{p.basePrice} {isRTL ? "ج.م" : "EGP"}</div>
                         <div style={{ fontSize: "0.75rem", color: "var(--text-2)", marginTop: 1 }}>{L("Min Order:", "أقل طلب:")} {p.minOrder}</div>
                       </div>
                       <div style={{ display: "flex", gap: 8 }}>
                         <button className="btn btn-success btn-sm" onClick={() => approveProduct(p.id)} style={{ display: "flex", alignItems: "center", gap: 4 }}>
                           <Check size={14} /> {L("Approve", "قبول")}
                         </button>
-                        <button className="btn btn-secondary btn-sm" onClick={() => rejectProduct(p.id)} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        <button className="btn btn-secondary btn-sm" onClick={() => setRejectingProduct(p)} style={{ display: "flex", alignItems: "center", gap: 4 }}>
                           <X size={14} style={{ color: "var(--danger)" }} /> {L("Reject", "رفض")}
                         </button>
                       </div>
@@ -858,6 +942,7 @@ export default function Dashboard({ onNavigate }) {
                         <th>{L("Role", "نوع الحساب")}</th>
                         <th>{L("Commercial Register", "السجل التجاري")}</th>
                         <th>{L("Tax Card", "البطاقة الضريبية")}</th>
+                        <th>{L("Actions", "الإجراءات")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -928,6 +1013,18 @@ export default function Dashboard({ onNavigate }) {
                                     </div>
                                   )}
                                 </div>
+                              </td>
+                              <td>
+                                <button
+                                  className="btn btn-ghost btn-icon-sm"
+                                  onClick={() => {
+                                    setDeletingUser(u);
+                                  }}
+                                  title={L("Delete Account", "حذف الحساب")}
+                                  style={{ padding: 4 }}
+                                >
+                                  <Trash2 size={14} style={{ color: "var(--danger)" }} />
+                                </button>
                               </td>
                             </tr>
                           );
@@ -1062,6 +1159,74 @@ export default function Dashboard({ onNavigate }) {
                 </button>
               </form>
             </aside>
+          </div>
+        )}
+
+        {/* ── ADMIN CONTACT MESSAGES TAB ────────────────── */}
+        {tab === "messages" && isAdmin && (
+          <div className="anim-fade-up">
+            <h3 className="section-title" style={{ marginBottom: 14 }}>
+              {L("User Support Tickets", "رسائل واستفسارات الدعم الفني")}
+            </h3>
+            {contactMessages.length === 0 ? (
+              <div className="empty-state card" style={{ padding: "40px 0" }}>
+                <div style={{ fontSize: "2.5rem", marginBottom: 12 }}>💬</div>
+                <h3 className="empty-title">{L("No support tickets submitted yet", "لا توجد تذاكر دعم فني بعد")}</h3>
+                <p className="empty-desc">{L("Messages sent via Contact Us will appear here.", "ستظهر الرسائل المرسلة من صفحة اتصل بنا هنا.")}</p>
+              </div>
+            ) : (
+              <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>{L("User Info", "بيانات المرسل")}</th>
+                      <th>{L("Subject", "الموضوع")}</th>
+                      <th>{L("Message", "الرسالة")}</th>
+                      <th>{L("Status", "الحالة")}</th>
+                      <th>{L("Submitted At", "تاريخ الإرسال")}</th>
+                      <th>{L("Action", "الرد")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {contactMessages.map((msg) => (
+                      <tr key={msg.id}>
+                        <td>
+                          <div>
+                            <div style={{ fontWeight: 800, fontSize: "0.85rem" }}>{msg.userName}</div>
+                            <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginTop: 2 }}>{msg.userEmail}</div>
+                          </div>
+                        </td>
+                        <td style={{ fontWeight: 600, fontSize: "0.82rem" }}>{msg.subject}</td>
+                        <td style={{ fontSize: "0.8rem", color: "var(--text-2)", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={msg.message}>
+                          {msg.message}
+                        </td>
+                        <td>
+                          {msg.status === "replied" ? (
+                            <span className="badge badge-success">{L("Replied", "تم الرد")}</span>
+                          ) : (
+                            <span className="badge badge-warning">{L("Pending Support", "بانتظار الرد")}</span>
+                          )}
+                        </td>
+                        <td style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                          {new Date(msg.createdAt).toLocaleDateString(isRTL ? "ar-EG" : "en-US")}
+                        </td>
+                        <td>
+                          <button
+                            className="btn btn-secondary btn-xs"
+                            onClick={() => {
+                              setReplyingMessage(msg);
+                              setReplyText(msg.reply || "");
+                            }}
+                          >
+                            {msg.status === "replied" ? (isRTL ? "تعديل الرد" : "Edit Reply") : (isRTL ? "الرد" : "Reply")}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1254,6 +1419,211 @@ export default function Dashboard({ onNavigate }) {
                   </>
                 )}
                 <button className="btn btn-ghost" onClick={() => setViewingDoc(null)}>{L("Close", "إغلاق")}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── REJECT PRODUCT WITH REASON MODAL ────────────────── */}
+      {rejectingProduct && (
+        <div className="modal-bg anim-fade-in" onClick={() => setRejectingProduct(null)}>
+          <div className="modal anim-scale-in" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420 }}>
+            <div className="modal-head">
+              <div className="modal-title">{isRTL ? "سبب رفض المنتج" : "Product Rejection Reason"}</div>
+              <button className="btn btn-ghost btn-icon btn-icon-sm" onClick={() => setRejectingProduct(null)}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p style={{ fontSize: "0.82rem", color: "var(--text-3)", marginBottom: 12 }}>
+                {isRTL 
+                  ? `يرجى إدخال سبب لرفض المنتج "${rejectingProduct.nameAr || rejectingProduct.nameEn}". سيتم إرسال هذا السبب كإشعار للمورد.`
+                  : `Please provide a reason for rejecting the product "${rejectingProduct.nameEn}". This reason will be sent as a notification to the supplier.`}
+              </p>
+              <textarea
+                className="form-input form-textarea"
+                placeholder={isRTL ? "مثال: السعر غير منطقي، الصور غير مناسبة..." : "e.g., Price is too high, blurry images..."}
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                style={{ minHeight: 80, width: "100%", padding: 10 }}
+              />
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 14 }}>
+                <button className="btn btn-secondary btn-sm" onClick={() => setRejectingProduct(null)}>
+                  {isRTL ? "إلغاء" : "Cancel"}
+                </button>
+                <button
+                  className="btn btn-primary btn-sm"
+                  style={{ background: "var(--danger)", border: "none" }}
+                  disabled={!rejectReason.trim()}
+                  onClick={() => {
+                    rejectProduct(rejectingProduct.id, rejectReason.trim());
+                    setRejectingProduct(null);
+                    setRejectReason("");
+                  }}
+                >
+                  {isRTL ? "تأكيد الرفض" : "Confirm Reject"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── VIEW PRODUCT DETAIL MODAL FOR ADMIN ────────────────── */}
+      {viewingProduct && (
+        <div className="modal-bg anim-fade-in" onClick={() => setViewingProduct(null)}>
+          <div className="modal anim-scale-in" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 500 }}>
+            <div className="modal-head">
+              <div className="modal-title">{isRTL ? "تفاصيل المنتج للمراجعة" : "Product Review Details"}</div>
+              <button className="btn btn-ghost btn-icon btn-icon-sm" onClick={() => setViewingProduct(null)}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div style={{ width: "100%", height: 200, background: viewingProduct.imageColor || "#e2e8f0", borderRadius: "var(--radius-lg)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                {viewingProduct.image ? (
+                  <img src={viewingProduct.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : (
+                  <span style={{ fontSize: "4rem" }}>📦</span>
+                )}
+              </div>
+              <div>
+                <h3 style={{ fontWeight: 800, fontSize: "1.15rem" }}>{isRTL ? viewingProduct.nameAr : viewingProduct.nameEn}</h3>
+                <p style={{ fontSize: "0.85rem", color: "var(--text-3)", marginTop: 4 }}>
+                  {isRTL ? "البائع:" : "Seller:"} <strong>{isRTL ? viewingProduct.sellerNameAr || viewingProduct.sellerName : viewingProduct.sellerName}</strong> ({getRoleLabel(viewingProduct.sellerRole)})
+                </p>
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: "0.85rem", marginBottom: 4 }}>{isRTL ? "الوصف:" : "Description:"}</div>
+                <p style={{ fontSize: "0.82rem", color: "var(--text-2)", background: "var(--bg-surface)", padding: 10, borderRadius: "var(--radius-sm)", lineHeight: 1.5 }}>
+                  {(isRTL ? viewingProduct.descriptionAr : viewingProduct.descriptionEn) || (isRTL ? "لا يوجد وصف متوفر" : "No description available")}
+                </p>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div style={{ background: "var(--bg-surface)", padding: 10, borderRadius: "var(--radius-md)" }}>
+                  <div style={{ fontSize: "0.7rem", color: "var(--text-3)" }}>{isRTL ? "السعر الأساسي" : "Base Price"}</div>
+                  <div style={{ fontWeight: 800, fontSize: "1rem" }}>{viewingProduct.basePrice} {isRTL ? "ج.م" : "EGP"}</div>
+                </div>
+                <div style={{ background: "var(--bg-surface)", padding: 10, borderRadius: "var(--radius-md)" }}>
+                  <div style={{ fontSize: "0.7rem", color: "var(--text-3)" }}>{isRTL ? "الحد الأدنى للطلب" : "Min Order Qty"}</div>
+                  <div style={{ fontWeight: 800, fontSize: "1rem" }}>{viewingProduct.minOrder} {isRTL ? "قطعة" : "pcs"}</div>
+                </div>
+              </div>
+              {viewingProduct.tiers?.length > 0 && (
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: "0.85rem", marginBottom: 6 }}>{isRTL ? "فئات الخصم:" : "Pricing Tiers:"}</div>
+                  <table className="tier-table" style={{ fontSize: "0.75rem" }}>
+                    <thead>
+                      <tr>
+                        <th>{isRTL ? "الكمية المطلوبة" : "Min Qty"}</th>
+                        <th>{isRTL ? "الخصم" : "Discount"}</th>
+                        <th>{isRTL ? "السعر الفعلي" : "Net Price"}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {viewingProduct.tiers.map((t, ti) => (
+                        <tr key={ti}>
+                          <td>{t.minQty}+</td>
+                          <td>{t.discount}%</td>
+                          <td>{(viewingProduct.basePrice * (1 - t.discount / 100)).toFixed(0)} {isRTL ? "ج.م" : "EGP"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── REPLY TO CONTACT MESSAGE MODAL ────────────────── */}
+      {replyingMessage && (
+        <div className="modal-bg anim-fade-in" onClick={() => setReplyingMessage(null)}>
+          <div className="modal anim-scale-in" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420 }}>
+            <div className="modal-head">
+              <div className="modal-title">{isRTL ? "الرد على استفسار" : "Reply to Inquiry"}</div>
+              <button className="btn btn-ghost btn-icon btn-icon-sm" onClick={() => setReplyingMessage(null)}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontWeight: 600 }}>
+                  {L("From:", "من:")} <strong>{replyingMessage.userName}</strong> ({replyingMessage.userEmail})
+                </div>
+                <div style={{ fontSize: "0.85rem", fontWeight: 700, margin: "6px 0" }}>
+                  {replyingMessage.subject}
+                </div>
+                <p style={{ fontSize: "0.8rem", color: "var(--text-2)", background: "var(--bg-muted)", padding: 10, borderRadius: "var(--radius-sm)", lineHeight: 1.5 }}>
+                  {replyingMessage.message}
+                </p>
+              </div>
+
+              <textarea
+                className="form-input form-textarea"
+                placeholder={isRTL ? "اكتب الرد هنا..." : "Type support reply here..."}
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                style={{ minHeight: 100, width: "100%", padding: 10 }}
+              />
+
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 14 }}>
+                <button className="btn btn-secondary btn-sm" onClick={() => setReplyingMessage(null)}>
+                  {isRTL ? "إلغاء" : "Cancel"}
+                </button>
+                <button
+                  className="btn btn-primary btn-sm"
+                  disabled={!replyText.trim()}
+                  onClick={() => {
+                    replyContactMessage(replyingMessage.id, replyText.trim());
+                    setReplyingMessage(null);
+                    setReplyText("");
+                  }}
+                >
+                  {isRTL ? "إرسال الرد" : "Send Reply"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── DELETE ACCOUNT CONFIRMATION MODAL ────────────────────── */}
+      {deletingUser && (
+        <div className="modal-bg anim-fade-in" onClick={() => setDeletingUser(null)}>
+          <div className="modal anim-scale-in" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 400 }}>
+            <div className="modal-head" style={{ borderBottom: "none", paddingBottom: 0 }}>
+              <div className="modal-title">{isRTL ? "حذف الحساب" : "Delete Account"}</div>
+              <button className="btn btn-ghost btn-icon btn-icon-sm" onClick={() => setDeletingUser(null)}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body" style={{ textAlign: "center", padding: "20px 24px", paddingTop: 10 }}>
+              <div style={{ fontSize: "3rem", marginBottom: 16 }}>⚠️</div>
+              <h3 style={{ marginBottom: 12, fontSize: "1.15rem", fontWeight: 800 }}>
+                {isRTL ? `حذف حساب ${deletingUser.nameAr || deletingUser.name}؟` : `Delete account for ${deletingUser.name}?`}
+              </h3>
+              <p style={{ color: "var(--text-muted)", marginBottom: 20, fontSize: "0.85rem", lineHeight: 1.5 }}>
+                {isRTL
+                  ? "هل أنت متأكد من حذف هذا الحساب نهائياً؟ سيتم حذف جميع منتجاته وسجلاته ولا يمكن التراجع عن هذا الإجراء."
+                  : "Are you sure you want to delete this account permanently? All products and records associated with it will be deleted. This action cannot be undone."}
+              </p>
+              <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+                <button className="btn btn-secondary" onClick={() => setDeletingUser(null)} style={{ flex: 1, padding: "10px" }}>
+                  {isRTL ? "إلغاء" : "Cancel"}
+                </button>
+                <button
+                  className="btn btn-primary"
+                  style={{ background: "var(--danger)", border: "none", flex: 1, padding: "10px" }}
+                  onClick={() => {
+                    deleteUser(deletingUser.id);
+                    setDeletingUser(null);
+                  }}
+                >
+                  {isRTL ? "حذف" : "Delete"}
+                </button>
               </div>
             </div>
           </div>

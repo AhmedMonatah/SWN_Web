@@ -58,7 +58,7 @@ export default function Header({ currentPage, onNavigate, onAuthClick }) {
     setMobileOpen(false);
   };
 
-  const isDarkHeader = currentPage === "home";
+  const isDarkHeader = currentPage === "home" && theme === "dark";
 
   return (
     <>
@@ -101,10 +101,10 @@ export default function Header({ currentPage, onNavigate, onAuthClick }) {
               <button className="nav-link" onClick={() => onAuthClick("login")}>
                 {L("Offers", "العروض")}
               </button>
-              <button className="nav-link" onClick={() => onAuthClick("login")}>
+              <button className={`nav-link ${currentPage === "about" ? "active" : ""}`} onClick={() => handleNav("about")}>
                 {L("About Us", "من نحن")}
               </button>
-              <button className="nav-link" onClick={() => onAuthClick("login")}>
+              <button className={`nav-link ${currentPage === "contact" ? "active" : ""}`} onClick={() => handleNav("contact")}>
                 {L("Contact Us", "تواصل معنا")}
               </button>
             </nav>
@@ -184,7 +184,7 @@ export default function Header({ currentPage, onNavigate, onAuthClick }) {
               </>
             ) : (
               <div style={{ display: "flex", gap: 7 }}>
-                <button className="btn btn-ghost btn-sm" onClick={() => onAuthClick("login")} style={{ color: "var(--header-text)" }}>
+                <button className="btn btn-ghost btn-sm" onClick={() => onAuthClick("login")}>
                   {L("Sign In", "تسجيل الدخول")}
                 </button>
                 <button className="btn btn-primary btn-sm" onClick={() => onAuthClick("register")}>
@@ -232,6 +232,12 @@ export default function Header({ currentPage, onNavigate, onAuthClick }) {
                   </button>
                   <button style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: "var(--radius-md)", border: "none", cursor: "pointer", textAlign: "start", background: currentPage === "products" ? "var(--brand-50)" : "transparent", color: currentPage === "products" ? "var(--brand)" : "var(--text-2)", fontWeight: 600, fontSize: ".88rem", width: "100%" }} onClick={() => handleNav("products")}>
                     {L("Products", "المنتجات")}
+                  </button>
+                  <button style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: "var(--radius-md)", border: "none", cursor: "pointer", textAlign: "start", background: currentPage === "about" ? "var(--brand-50)" : "transparent", color: currentPage === "about" ? "var(--brand)" : "var(--text-2)", fontWeight: 600, fontSize: ".88rem", width: "100%" }} onClick={() => handleNav("about")}>
+                    {L("About Us", "من نحن")}
+                  </button>
+                  <button style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: "var(--radius-md)", border: "none", cursor: "pointer", textAlign: "start", background: currentPage === "contact" ? "var(--brand-50)" : "transparent", color: currentPage === "contact" ? "var(--brand)" : "var(--text-2)", fontWeight: 600, fontSize: ".88rem", width: "100%" }} onClick={() => handleNav("contact")}>
+                    {L("Contact Us", "تواصل معنا")}
                   </button>
                 </>
               )}

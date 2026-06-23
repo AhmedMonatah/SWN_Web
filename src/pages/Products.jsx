@@ -26,7 +26,7 @@ export default function Products({ onAuthClick }) {
   const [minP, setMinP] = useState("");
   const [maxP, setMaxP] = useState("");
 
-  const canBuy = currentUser && ["wholesaler", "retailer"].includes(currentUser.role);
+  const canBuy = !currentUser || ["wholesaler", "retailer"].includes(currentUser.role);
 
   // If supplier role somehow enters here, show warning
   if (currentUser?.role === "supplier") {
@@ -97,6 +97,10 @@ export default function Products({ onAuthClick }) {
   };
 
   const handleAddToCart = () => {
+    if (!currentUser) {
+      onAuthClick("login");
+      return;
+    }
     addToCart(detail, qty);
     setDetail(null);
   };
@@ -206,14 +210,14 @@ export default function Products({ onAuthClick }) {
             
             {/* Toolbar */}
             <div className="card" style={{ padding: 12, marginBottom: 16, display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between" }}>
-              <div className="search-bar" style={{ flex: "1 1 300px", background: "var(--bg-surface)", border: "1px solid var(--border)", height: 40 }}>
+              <div className="search-bar" style={{ flex: "1 1 300px", background: "var(--bg-surface)", border: "1px solid var(--border)", height: 40, borderRadius: "var(--radius-md)", display: "flex", alignItems: "center", padding: "0 12px", gap: 8 }}>
                 <Search size={16} className="search-icon" style={{ color: "var(--text-3)" }} />
                 <input
                   className="search-input"
                   placeholder={L("Search by name, brand, tag...", "ابحث عن منتج، علامة تجارية أو وصف...")}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  style={{ background: "transparent" }}
+                  style={{ border: "none", outline: "none", background: "transparent", width: "100%", fontSize: "0.85rem", color: "var(--text-1)" }}
                 />
                 {search && (
                   <button onClick={() => setSearch("")} style={{ border: "none", background: "none", cursor: "pointer", display: "flex", padding: 8 }}>
@@ -325,7 +329,7 @@ export default function Products({ onAuthClick }) {
               </div>
 
               {(isRTL ? detail.descriptionAr : detail.descriptionEn) && (
-                <p style={{ fontSize: ".82rem", color: "var(--text-2)", lineHeight: 1.6, background: "#f8f9fa", padding: "10px 12px", borderRadius: "var(--radius-sm)" }}>
+                <p style={{ fontSize: ".82rem", color: "var(--text-2)", lineHeight: 1.6, background: "var(--bg-surface)", padding: "10px 12px", borderRadius: "var(--radius-sm)" }}>
                   {isRTL ? detail.descriptionAr : detail.descriptionEn}
                 </p>
               )}
@@ -355,6 +359,14 @@ export default function Products({ onAuthClick }) {
                     {isRTL ? detail.sellerNameAr || detail.sellerName : detail.sellerName}
                   </div>
                 </div>
+              </div>
+
+              {/* Remaining Stock */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.82rem", padding: "10px 12px", background: "var(--bg-muted)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
+                <span style={{ fontWeight: 600, color: "var(--text-2)" }}>{L("Remaining Stock:", "المخزون المتبقي:")}</span>
+                <strong style={{ color: detail.quantity < 50 ? "var(--danger)" : "var(--success)" }}>
+                  {detail.quantity} {L("units", "قطعة")}
+                </strong>
               </div>
 
               {/* Volume Discount Tiers table */}
@@ -400,10 +412,31 @@ export default function Products({ onAuthClick }) {
                     <input
                       type="number"
                       value={qty}
-                      onChange={(e) => setQty(Math.max(detail.minOrder, Number(e.target.value)))}
-                      style={{ width: 64, textAlign: "center", border: "none", fontWeight: 700, fontSize: ".85rem", padding: "8px 0" }}
+                      onChange={(e) => {
+                        const val = Math.max(detail.minOrder, Number(e.target.value));
+                        if (val > detail.quantity) {
+                          alert(isRTL 
+                            ? `المخزون غير كافٍ! الكمية المتاحة في المخزون هي ${detail.quantity} قطعة فقط.`
+                            : `Insufficient stock! Only ${detail.quantity} units are remaining in stock.`
+                          );
+                          setQty(detail.quantity);
+                        } else {
+                          setQty(val);
+                        }
+                      }}
+                      style={{ width: 64, textAlign: "center", border: "none", outline: "none", background: "transparent", color: "var(--text-1)", fontWeight: 700, fontSize: ".85rem", padding: "8px 0" }}
                     />
-                    <button style={{ padding: "8px 12px", background: "var(--bg-surface)", border: "none", cursor: "pointer", color: "var(--text-2)" }} onClick={() => setQty((q) => q + detail.minOrder)}>
+                    <button style={{ padding: "8px 12px", background: "var(--bg-surface)", border: "none", cursor: "pointer", color: "var(--text-2)" }} onClick={() => setQty((q) => {
+                      const next = q + detail.minOrder;
+                      if (next > detail.quantity) {
+                        alert(isRTL 
+                          ? `المخزون غير كافٍ! الكمية المتاحة في المخزون هي ${detail.quantity} قطعة فقط.`
+                          : `Insufficient stock! Only ${detail.quantity} units are remaining in stock.`
+                        );
+                        return q;
+                      }
+                      return next;
+                    })}>
                       <Plus size={14} />
                     </button>
                   </div>

@@ -97,7 +97,7 @@ export default function Register({ onNavigate }) {
                     <div style={{ fontSize: ".9rem", fontWeight: 700, color: "var(--text-1)" }}>{L(r.en, r.ar)}</div>
                     <div style={{ fontSize: ".75rem", color: "var(--text-3)", marginTop: 2 }}>{L(r.descEn, r.descAr)}</div>
                   </div>
-                  <ArrowRight size={16} style={{ color: "var(--text-4)", flexShrink: 0 }} />
+                  <ArrowRight size={16} className="mirror-rtl" style={{ color: "var(--text-4)", flexShrink: 0 }} />
                 </button>
               ))}
             </div>
@@ -112,7 +112,7 @@ export default function Register({ onNavigate }) {
         {/* ── STEP 2: Details ──────────────────── */}
         {step === 2 && (
           <div className="anim-fade-up">
-            <div>
+            <div style={{ marginBottom: 24 }}>
               <h1 className="auth-title">{L("Account Details", "بيانات الحساب")}</h1>
               <p className="auth-subtitle">{L("Complete your business profile", "أكمل ملفك التجاري")}</p>
             </div>
@@ -194,7 +194,7 @@ export default function Register({ onNavigate }) {
               </div>
 
               <button type="submit" className="btn btn-primary btn-lg w-full" disabled={loading} style={{ marginTop: 4 }}>
-                {loading ? <span className="btn-spinner" /> : <>{L("Create Account", "إنشاء الحساب")} <ArrowRight size={17} /></>}
+                {loading ? <span className="btn-spinner" /> : <>{L("Create Account", "إنشاء الحساب")} <ArrowRight size={17} className="mirror-rtl" /></>}
               </button>
             </form>
           </div>

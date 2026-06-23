@@ -30,15 +30,15 @@ export default function Home({ onNavigate, onAuthClick }) {
         <div className="hero-orb orb-bottom-right" />
 
         <div className="container">
-          {/* Force LTR so text is always left, image always right */}
-          <div className="hero-container-mockup" style={{ direction: "ltr" }}>
+          {/* Respect RTL/LTR layout direction for text and image columns */}
+          <div className="hero-container-mockup" style={{ direction: isRTL ? "rtl" : "ltr" }}>
 
             {/* ── LEFT: text content ── */}
             <div className="hero-left-content" dir={isRTL ? "rtl" : "ltr"}>
               {/* Badge */}
               <div className="hero-badge-mockup">
                 <span className="badge-spark">✦</span>
-                {L("One platform.. unlimited opportunities", "منصة واحدة.. فرص لا محدودة")}
+                <span style={{ marginInlineStart: 8 }}>{L("One platform.. unlimited opportunities", "منصة واحدة.. فرص لا محدودة")}</span>
               </div>
 
               {/* Main heading */}
@@ -79,14 +79,14 @@ export default function Home({ onNavigate, onAuthClick }) {
                   className="btn-cta-primary"
                   onClick={() => (currentUser ? onNavigate("products") : onAuthClick("login"))}
                 >
-                  {L("Start Buying Now", "ابدأ الشراء الآن")}
-                  <span className="arrow-icon">{isRTL ? "←" : "→"}</span>
+                  <span style={{ marginInlineEnd: 8 }}>{L("Start Buying Now", "ابدأ الشراء الآن")}</span>
+                  <span className="arrow-icon">→</span>
                 </button>
                 <button className="btn-cta-video" onClick={() => setShowVideo(true)}>
-                  <span className="play-icon-wrap">
+                  <span className="play-icon-wrap" style={{ marginInlineEnd: 8 }}>
                     <Play size={11} fill="currentColor" />
                   </span>
-                  {L("Watch how it works", "شاهد كيف تعمل المنصة")}
+                  <span>{L("Watch how it works", "شاهد كيف تعمل المنصة")}</span>
                 </button>
               </div>
             </div>
@@ -122,24 +122,8 @@ export default function Home({ onNavigate, onAuthClick }) {
                     <span>{L("Profits", "أرباح")} ↗</span>
                   </div>
                 </div>
-                <div className="growth-graph-svg">
-                  <svg width="56" height="32" viewBox="0 0 56 32" fill="none">
-                    <defs>
-                      <linearGradient id="hgc" x1="0" y1="32" x2="56" y2="0" gradientUnits="userSpaceOnUse">
-                        <stop stopColor="#1d4ed8" />
-                        <stop offset="1" stopColor="#3b82f6" />
-                      </linearGradient>
-                    </defs>
-                    <path
-                      d="M2 28 C12 22 22 17 32 12 C42 7 50 5 54 3"
-                      stroke="url(#hgc)" strokeWidth="2.5" strokeLinecap="round"
-                    />
-                    <path
-                      d="M2 30 C12 24 22 19 32 14 C42 9 50 7 54 5 L54 32 L2 32 Z"
-                      fill="url(#hgc)" fillOpacity="0.1"
-                    />
-                    <circle cx="54" cy="3" r="3.5" fill="#2563eb" />
-                  </svg>
+                <div className="growth-graph-svg" style={{ width: 56, height: 32, display: "flex", alignItems: "center" }}>
+                  <img src="/curve_up.png" alt="Growth Curve" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
                 </div>
               </div>
 
@@ -150,13 +134,13 @@ export default function Home({ onNavigate, onAuthClick }) {
                 </div>
                 <div className="product-info-col" dir={isRTL ? "rtl" : "ltr"}>
                   <div className="product-name">{L("Modern Chair", "كرسي مودرن")}</div>
-                  <div className="product-price">320.00 {L("EGP", "ريال")}</div>
+                  <div className="product-price">320.00 {L("EGP", "ج.م")}</div>
                   <button
                     className="btn-product-buy"
                     onClick={() => (currentUser ? onNavigate("products") : onAuthClick("login"))}
                   >
-                    <ShoppingCart size={10} style={{ marginInlineEnd: 4 }} />
-                    {L("Add to Cart", "أضف للسلة")}
+                    <ShoppingCart size={14} style={{ marginInlineEnd: 6 }} />
+                    <span>{L("Add to Cart", "أضف للسلة")}</span>
                   </button>
                 </div>
               </div>
@@ -174,15 +158,46 @@ export default function Home({ onNavigate, onAuthClick }) {
             <div className="trusted-lbl">
               {L("Trusted by +10,000 traders", "موضع ثقة +10,000 تاجر")}
             </div>
-            <div className="logo-badges-row">
-              {[
-                L("Abu Samra", "أبو سميح"),
-                L("Nahdi", "النهدي"),
-                L("Bin Dawoud", "بن داوود"),
-                L("Al Dawaa", "الدواء"),
-              ].map((name, i) => (
-                <div key={i} className="logo-badge">{name}</div>
-              ))}
+            {/* Infinite auto-scroll logo carousel */}
+            <div className="logo-scroll-track-wrap">
+              <div className="logo-scroll-track" dir="ltr">
+                {[...Array(4)].map((_, loopIdx) => (
+                  <React.Fragment key={loopIdx}>
+                    {[
+                      { img: "/IbnMasoud.png", en: "Ibn Masoud", ar: "ابن مسعود" },
+                      { img: "/Anabar.png",    en: "Al Anabar",  ar: "العنبر" },
+                      { img: "/YaHalawa.png", en: "Ya Halawa",  ar: "يا حلاوة" },
+                      { img: "/Monarch.png",  en: "Monarch",    ar: "مونارك" },
+                    ].map((comp, i) => (
+                      <div key={i} className="partner-logo-circle-wrap">
+                        <div className="partner-logo-circle">
+                          <img src={comp.img} alt={comp.en} className="partner-logo-img" />
+                        </div>
+                        <span className="partner-logo-name">{L(comp.en, comp.ar)}</span>
+                      </div>
+                    ))}
+                  </React.Fragment>
+                ))}
+              </div>
+              <div className="logo-scroll-track" aria-hidden="true" dir="ltr">
+                {[...Array(4)].map((_, loopIdx) => (
+                  <React.Fragment key={loopIdx}>
+                    {[
+                      { img: "/IbnMasoud.png", en: "Ibn Masoud", ar: "ابن مسعود" },
+                      { img: "/Anabar.png",    en: "Al Anabar",  ar: "العنبر" },
+                      { img: "/YaHalawa.png", en: "Ya Halawa",  ar: "يا حلاوة" },
+                      { img: "/Monarch.png",  en: "Monarch",    ar: "مونارك" },
+                    ].map((comp, i) => (
+                      <div key={i} className="partner-logo-circle-wrap">
+                        <div className="partner-logo-circle">
+                          <img src={comp.img} alt={comp.en} className="partner-logo-img" />
+                        </div>
+                        <span className="partner-logo-name">{L(comp.en, comp.ar)}</span>
+                      </div>
+                    ))}
+                  </React.Fragment>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -236,7 +251,7 @@ export default function Home({ onNavigate, onAuthClick }) {
                     <span className="seller-badge">{isRTL ? p.sellerNameAr || p.sellerName : p.sellerName}</span>
                     <h3 className="catalog-name">{isRTL ? p.nameAr : p.nameEn}</h3>
                     <div className="catalog-price-row">
-                      <span className="price-val">{p.basePrice.toLocaleString()} EGP</span>
+                      <span className="price-val">{p.basePrice.toLocaleString()} {isRTL ? "ج.م" : "EGP"}</span>
                       <span className="moq-val">MOQ: {p.minOrder}</span>
                     </div>
                   </div>

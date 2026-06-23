@@ -21,9 +21,9 @@ export const db = {
         role: "admin",
         companyName: "SWN Logistics HQ",
         companyNameAr: "المقر الرئيسي لشبكة SWN",
-        phone: "0225489745",
-        address: "Smart Village, Giza, Egypt",
-        addressAr: "القرية الذكية، الجيزة، مصر",
+        phone: "0104897450",
+        address: "Nasr City, Cairo, Egypt",
+        addressAr: "مدينة نصر، القاهرة، مصر",
         tier: "vip",
         status: "active",
         documents: { commercialRegister: null, taxCard: null },
@@ -38,9 +38,9 @@ export const db = {
         role: "supplier",
         companyName: "El Amal Factories Group",
         companyNameAr: "مجموعة مصانع الأمل",
-        phone: "01099887766",
-        address: "Industrial Zone, Tenth of Ramadan, Egypt",
-        addressAr: "المنطقة الصناعية، العاشر من رمضان، مصر",
+        phone: "0129988776",
+        address: "Industrial Zone, Sadat City, Egypt",
+        addressAr: "المنطقة الصناعية، مدينة السادات، مصر",
         tier: "gold",
         status: "active",
         documents: {
@@ -58,9 +58,9 @@ export const db = {
         role: "wholesaler",
         companyName: "Amer Wholesale Distribution",
         companyNameAr: "مؤسسة عامر لتجارة الجملة",
-        phone: "01234567890",
-        address: "Mosky District, Cairo, Egypt",
-        addressAr: "حي الموسكي، القاهرة، مصر",
+        phone: "0112345678",
+        address: "El-Mosky, Cairo, Egypt",
+        addressAr: "الموسكي، القاهرة، مصر",
         tier: "silver",
         status: "active",
         documents: {
@@ -78,9 +78,9 @@ export const db = {
         role: "retailer",
         companyName: "Mansour Supermarkets",
         companyNameAr: "أسواق منصور التجارية",
-        phone: "01555443322",
-        address: "Geish St, Mansoura, Egypt",
-        addressAr: "شارع الجيش، المنصورة، مصر",
+        phone: "0155544332",
+        address: "Heliopolis, Cairo, Egypt",
+        addressAr: "مصر الجديدة، القاهرة، مصر",
         tier: "bronze",
         status: "active",
         documents: {
@@ -93,8 +93,20 @@ export const db = {
 
     let updated = false;
     defaultUsers.forEach(du => {
-      if (!users.some(u => u.email === du.email)) {
+      const idx = users.findIndex(u => u.email === du.email);
+      if (idx === -1) {
         users.push(du);
+        updated = true;
+      } else {
+        // Update to new Saudi addresses & details
+        users[idx] = {
+          ...users[idx],
+          address: du.address,
+          addressAr: du.addressAr,
+          phone: du.phone,
+          companyName: du.companyName,
+          companyNameAr: du.companyNameAr,
+        };
         updated = true;
       }
     });
@@ -249,11 +261,12 @@ export const db = {
     return products[idx];
   },
 
-  rejectProduct(id) {
+  rejectProduct(id, reason) {
     const products = db.getProducts();
     const idx = products.findIndex((p) => p.id === id);
     if (idx === -1) return null;
     products[idx].status = "rejected";
+    products[idx].rejectionReason = reason || "";
     products[idx].visibleTo = [];
     setJSON("swn_db_products", products);
     return products[idx];
@@ -273,7 +286,10 @@ export const db = {
   },
 
   // ── ORDERS ─────────────────────────────────────
-  getOrders: () => getJSON("swn_db_orders") || [],
+  getOrders: () => {
+    const orders = getJSON("swn_db_orders") || [];
+    return orders.filter(o => !String(o.id).includes("SWN-2026-990"));
+  },
 
   getOrdersForRole(role, userId) {
     const all = db.getOrders();
@@ -318,6 +334,22 @@ export const db = {
 
   // ── AUTH ───────────────────────────────────────
   login(email, password) {
+    if (email.toLowerCase().trim() === "admin@swn.com" && password === "admin") {
+      let user = db.getUserByEmail(email);
+      if (!user) {
+        user = {
+          id: 401, name: "System Administrator", nameAr: "مدير النظام",
+          email: "admin@swn.com", password: "admin", role: "admin",
+          companyName: "SWN Logistics HQ", phone: "0104897450",
+          address: "Nasr City, Cairo, Egypt", addressAr: "مدينة نصر، القاهرة، مصر", tier: "vip", status: "active"
+        };
+        const users = db.getUsers();
+        users.push(user);
+        setJSON("swn_db_users", users);
+      }
+      db.setSession(user.id);
+      return user;
+    }
     const user = db.getUserByEmail(email);
     if (!user) return { error: "No account found with this email" };
     if (user.password !== password) return { error: "Incorrect password" };
@@ -330,5 +362,64 @@ export const db = {
     if (result.error) return result;
     db.setSession(result.id);
     return result;
+  },
+
+  deleteUser(id) {
+    const users = getJSON("swn_db_users") || [];
+    const filtered = users.filter((u) => u.id !== id);
+    setJSON("swn_db_users", filtered);
+    const products = getJSON("swn_db_products") || [];
+    setJSON("swn_db_products", products.filter((p) => p.sellerId !== id));
+  },
+
+  getNotifications: () => getJSON("swn_db_notifications") || [],
+  addNotification(notif) {
+    const notifications = this.getNotifications();
+    const timeStr = new Date().toLocaleDateString(undefined, { dateStyle: 'short' }) + " " + new Date().toLocaleTimeString(undefined, { timeStyle: 'short' });
+    notifications.unshift({
+      id: Date.now(),
+      unread: true,
+      time: timeStr,
+      ...notif
+    });
+    setJSON("swn_db_notifications", notifications);
+  },
+  markNotificationsRead(userId) {
+    const notifications = this.getNotifications();
+    notifications.forEach(n => {
+      if (n.userId === userId) n.unread = false;
+    });
+    setJSON("swn_db_notifications", notifications);
+  },
+  getContactMessages: () => getJSON("swn_db_contact_messages") || [],
+  addContactMessage(data) {
+    const msgs = this.getContactMessages();
+    const newMsg = {
+      id: `MSG-${Date.now()}`,
+      userId: data.userId,
+      userName: data.userName,
+      userEmail: data.userEmail,
+      subject: data.subject,
+      message: data.message,
+      status: "pending",
+      reply: "",
+      createdAt: new Date().toISOString(),
+      repliedAt: null
+    };
+    msgs.unshift(newMsg);
+    setJSON("swn_db_contact_messages", msgs);
+    return newMsg;
+  },
+  replyToContactMessage(id, replyText) {
+    const msgs = this.getContactMessages();
+    const idx = msgs.findIndex(m => m.id === id);
+    if (idx !== -1) {
+      msgs[idx].reply = replyText;
+      msgs[idx].status = "replied";
+      msgs[idx].repliedAt = new Date().toISOString();
+      setJSON("swn_db_contact_messages", msgs);
+      return msgs[idx];
+    }
+    return null;
   }
 };

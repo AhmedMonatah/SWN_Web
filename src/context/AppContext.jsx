@@ -51,17 +51,27 @@ export function AppProvider({ children }) {
   const [currentUser, setCurrentUserState] = useState(() => db.getSession());
   const setCurrentUser = (user) => {
     setCurrentUserState(user);
-    if (user) db.setSession(user.id);
-    else db.clearSession();
+    if (user) {
+      db.setSession(user.id);
+      loadProducts();
+      loadOrders(user);
+      loadUsers(user);
+      loadNotifications(user);
+    } else {
+      db.clearSession();
+    }
   };
-  const logout = () => {
-    const confirmMsg = language === "ar" ? "هل أنت متأكد من تسجيل الخروج؟" : "Are you sure you want to sign out?";
-    if (!window.confirm(confirmMsg)) return;
+  const performLogout = () => {
     db.clearSession();
     setCurrentUserState(null);
     setProducts([]);
     setOrders([]);
     setCart([]);
+    setActiveDrawer(null);
+    window.location.href = window.location.origin + window.location.pathname;
+  };
+  const logout = () => {
+    setActiveDrawer("logout");
   };
 
   // ── Products ──────────────────────────────────
@@ -91,21 +101,41 @@ export function AppProvider({ children }) {
   };
 
   const approveProduct = (id) => {
-    db.approveProduct(id);
+    const prod = db.approveProduct(id);
     loadProducts();
+    if (prod) {
+      db.addNotification({
+        userId: prod.sellerId,
+        titleEn: "Product Approved",
+        titleAr: "تم قبول المنتج",
+        descEn: `Your product "${prod.nameEn}" has been approved and is now live!`,
+        descAr: `تمت الموافقة على منتجك "${prod.nameAr || prod.nameEn}" وهو متوفر الآن على المنصة!`
+      });
+      loadNotifications();
+    }
     showToast(language === "ar" ? "تم قبول المنتج بنجاح" : "Product approved successfully", "success");
   };
 
-  const rejectProduct = (id) => {
-    db.rejectProduct(id);
+  const rejectProduct = (id, reason) => {
+    const prod = db.rejectProduct(id, reason);
     loadProducts();
+    if (prod) {
+      db.addNotification({
+        userId: prod.sellerId,
+        titleEn: "Product Rejected",
+        titleAr: "تم رفض المنتج",
+        descEn: `Your product "${prod.nameEn}" was rejected by the admin. Reason: ${reason}`,
+        descAr: `تم رفض منتجك "${prod.nameAr || prod.nameEn}" من قِبل الإدارة. السبب: ${reason}`
+      });
+      loadNotifications();
+    }
     showToast(language === "ar" ? "تم رفض المنتج" : "Product rejected", "info");
   };
 
   // ── Users (for admin) ──────────────────────────
   const [users, setUsers] = useState([]);
-  const loadUsers = useCallback(() => {
-    if (currentUser?.role === "admin") {
+  const loadUsers = useCallback((user = currentUser) => {
+    if (user?.role === "admin") {
       setUsers(db.getJSON?.("swn_db_users") || db.getUsers());
     } else {
       setUsers([]);
@@ -131,11 +161,19 @@ export function AppProvider({ children }) {
     showToast(language === "ar" ? "تم رفض المستند" : "Document rejected", "info");
   };
 
+  const deleteUser = (userId) => {
+    db.deleteUser(userId);
+    loadUsers();
+    loadProducts();
+    loadOrders();
+    showToast(language === "ar" ? "تم حذف الحساب بنجاح" : "Account deleted successfully", "success");
+  };
+
   // ── Orders ────────────────────────────────────
   const [orders, setOrders] = useState([]);
-  const loadOrders = useCallback(() => {
-    if (!currentUser) { setOrders([]); return; }
-    setOrders(db.getOrdersForRole(currentUser.role, currentUser.id));
+  const loadOrders = useCallback((user = currentUser) => {
+    if (!user) { setOrders([]); return; }
+    setOrders(db.getOrdersForRole(user.role, user.id));
   }, [currentUser]);
   useEffect(() => { loadOrders(); }, [loadOrders]);
 
@@ -148,9 +186,44 @@ export function AppProvider({ children }) {
       status:       "pending",
       timeline:     [{ status: "pending", time: new Date().toISOString() }],
     });
+    
+    // Deduct remaining stock
+    if (data.items?.length) {
+      data.items.forEach(item => {
+        const prod = products.find(p => p.id === item.productId);
+        if (prod) {
+          const nextQty = Math.max(0, prod.quantity - item.quantity);
+          db.updateProduct(prod.id, { quantity: nextQty });
+        }
+      });
+      loadProducts();
+    }
+    
     setCart([]);
     loadOrders();
-    // Refresh current user session to update tier calculations instantly
+    if (data.items?.length) {
+      const sellers = {};
+      data.items.forEach(item => {
+        const sId = item.sellerId || products.find(x => x.id === item.productId || x.id === item.id)?.sellerId;
+        if (sId) {
+          if (!sellers[sId]) sellers[sId] = [];
+          sellers[sId].push(item);
+        }
+      });
+      Object.keys(sellers).forEach(sellerId => {
+        const itemsList = sellers[sellerId];
+        const namesEn = itemsList.map(x => x.nameEn || x.product?.nameEn).join(", ");
+        const namesAr = itemsList.map(x => x.nameAr || x.product?.nameAr || x.nameEn || x.product?.nameEn).join(", ");
+        db.addNotification({
+          userId: Number(sellerId),
+          titleEn: "New Order Received",
+          titleAr: "طلب شراء جديد",
+          descEn: `You received a new order from ${currentUser.name} for: ${namesEn}`,
+          descAr: `لقد استلمت طلب شراء جديد من ${currentUser.nameAr || currentUser.name} لمنتجات: ${namesAr}`
+        });
+      });
+      loadNotifications();
+    }
     setCurrentUser(db.getUserById(currentUser.id));
     return order;
   };
@@ -167,16 +240,41 @@ export function AppProvider({ children }) {
   const addToCart = (product, qty) => {
     setCart(prev => {
       const idx = prev.findIndex(i => i.product.id === product.id);
+      let newQty = qty;
+      if (idx > -1) {
+        newQty = prev[idx].quantity + qty;
+      }
+      
+      // Stock checking validation
+      if (newQty > product.quantity) {
+        alert(language === "ar"
+          ? `المخزون غير كافٍ! الكمية المتاحة في المخزون هي ${product.quantity} قطعة فقط.`
+          : `Insufficient stock! Only ${product.quantity} units are remaining in stock.`
+        );
+        return prev;
+      }
+
       if (idx > -1) {
         const next = [...prev];
-        next[idx] = { ...next[idx], quantity: next[idx].quantity + qty };
+        next[idx] = { ...next[idx], quantity: newQty };
         return next;
       }
       return [...prev, { product, quantity: qty }];
     });
   };
+  
   const updateCartQty = (productId, qty) => {
     if (qty <= 0) { removeFromCart(productId); return; }
+    
+    const prod = products.find(p => p.id === productId);
+    if (prod && qty > prod.quantity) {
+      alert(language === "ar"
+        ? `المخزون غير كافٍ! الكمية المتاحة في المخزون هي ${prod.quantity} قطعة فقط.`
+        : `Insufficient stock! Only ${prod.quantity} units are remaining in stock.`
+      );
+      return;
+    }
+    
     setCart(prev => prev.map(i => i.product.id === productId ? { ...i, quantity: qty } : i));
   };
   const removeFromCart = (productId) => setCart(prev => prev.filter(i => i.product.id !== productId));
@@ -184,8 +282,49 @@ export function AppProvider({ children }) {
 
   // ── Notifications ─────────────────────────────
   const [notifications, setNotifications] = useState([]);
-  const markAllRead = () => setNotifications(n => n.map(x => ({ ...x, unread: false })));
+  const loadNotifications = useCallback((user = currentUser) => {
+    if (!user) { setNotifications([]); return; }
+    const allNotifs = db.getNotifications();
+    setNotifications(allNotifs.filter(n => n.userId === user.id || n.role === user.role || (!n.userId && !n.role)));
+  }, [currentUser]);
+  useEffect(() => { loadNotifications(); }, [loadNotifications]);
+
+  const markAllRead = () => {
+    if (currentUser) {
+      db.markNotificationsRead(currentUser.id);
+      loadNotifications();
+    }
+  };
   const markAllNotificationsRead = markAllRead;
+
+  // ── Contact Messages ──────────────────────────
+  const [contactMessages, setContactMessages] = useState([]);
+  const loadContactMessages = useCallback(() => {
+    setContactMessages(db.getContactMessages());
+  }, []);
+  useEffect(() => { loadContactMessages(); }, [loadContactMessages]);
+
+  const sendContactMessage = (msgData) => {
+    db.addContactMessage(msgData);
+    loadContactMessages();
+    showToast(language === "ar" ? "تم إرسال رسالتك بنجاح للمدير" : "Your message was sent successfully to Admin", "success");
+  };
+
+  const replyContactMessage = (id, replyText) => {
+    const msg = db.replyToContactMessage(id, replyText);
+    loadContactMessages();
+    if (msg) {
+      db.addNotification({
+        userId: msg.userId,
+        titleEn: "New Reply from Support",
+        titleAr: "رد جديد من الدعم الفني",
+        descEn: `Support replied to your message "${msg.subject}": ${replyText}`,
+        descAr: `قام الدعم بالرد على رسالتك "${msg.subject}": ${replyText}`
+      });
+      loadNotifications();
+    }
+    showToast(language === "ar" ? "تم إرسال الرد بنجاح" : "Reply sent successfully", "success");
+  };
 
   // ── Drawer ────────────────────────────────────
   const [activeDrawer, setActiveDrawer] = useState(null);
@@ -201,12 +340,13 @@ export function AppProvider({ children }) {
   const value = {
     theme, toggleTheme,
     language, setLanguage,
-    currentUser, setCurrentUser, logout,
+    currentUser, setCurrentUser, logout, performLogout,
     products, loadProducts, addNewProduct, deleteProduct, approveProduct, rejectProduct,
-    users, loadUsers, approveDocument, rejectDocument,
+    users, loadUsers, approveDocument, rejectDocument, deleteUser,
     orders, loadOrders, createOrder, updateOrderStatus,
     cart, addToCart, updateCartQty, removeFromCart, clearCart,
     notifications, markAllRead, markAllNotificationsRead,
+    contactMessages, sendContactMessage, replyContactMessage,
     activeDrawer, setActiveDrawer,
     toasts, showToast,
     getNavForRole, getDefaultPage,
