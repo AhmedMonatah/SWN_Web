@@ -60,7 +60,10 @@ export default function Dashboard({ onNavigate }) {
 
   const [form, setForm] = useState({
     nameEn: "", nameAr: "", descriptionEn: "", descriptionAr: "",
-    category: "clothing", basePrice: "", quantity: "", minOrder: "",
+    category: "clothing",
+    priceWholesaler: "", minOrderWholesaler: "", maxOrderWholesaler: "",
+    priceRetailer: "", minOrderRetailer: "", maxOrderRetailer: "",
+    basePrice: "", quantity: "", minOrder: "", maxOrder: "",
     image: null,
     tiers: [{ minQty: "", discount: 0 }]
   });
@@ -163,21 +166,45 @@ export default function Dashboard({ onNavigate }) {
   };
 
   const handleAdd = () => {
-    if (!form.nameEn || !form.basePrice || !form.minOrder || !form.quantity) return;
+    const isSupplier = currentUser?.role === "supplier";
+    const isWholesaler = currentUser?.role === "wholesaler";
+
+    // Validate required fields
+    if (!form.nameEn || !form.quantity) return;
+    if (isSupplier && (!form.priceWholesaler || !form.minOrderWholesaler || !form.priceRetailer || !form.minOrderRetailer)) return;
+    if (isWholesaler && (!form.priceRetailer || !form.minOrderRetailer)) return;
+
     setSaving(true);
     setTimeout(() => {
+      // Set a fallback basePrice and minOrder for general lookups (e.g. Admin approvals tab)
+      const basePriceVal = isSupplier ? Number(form.priceWholesaler) : Number(form.priceRetailer);
+      const minOrderVal = isSupplier ? Number(form.minOrderWholesaler) : Number(form.minOrderRetailer);
+      const maxOrderVal = isSupplier 
+        ? (form.maxOrderWholesaler ? Number(form.maxOrderWholesaler) : null) 
+        : (form.maxOrderRetailer ? Number(form.maxOrderRetailer) : null);
+
       addNewProduct({
         ...form,
-        basePrice: Number(form.basePrice),
+        basePrice: basePriceVal,
+        minOrder: minOrderVal,
+        maxOrder: maxOrderVal,
+        priceWholesaler: form.priceWholesaler ? Number(form.priceWholesaler) : null,
+        minOrderWholesaler: form.minOrderWholesaler ? Number(form.minOrderWholesaler) : null,
+        maxOrderWholesaler: form.maxOrderWholesaler ? Number(form.maxOrderWholesaler) : null,
+        priceRetailer: form.priceRetailer ? Number(form.priceRetailer) : null,
+        minOrderRetailer: form.minOrderRetailer ? Number(form.minOrderRetailer) : null,
+        maxOrderRetailer: form.maxOrderRetailer ? Number(form.maxOrderRetailer) : null,
         quantity: Number(form.quantity),
-        minOrder: Number(form.minOrder),
         tiers: form.tiers
           .map((t) => ({ minQty: Number(t.minQty), discount: Number(t.discount) }))
           .filter((t) => t.minQty > 0)
       });
       setForm({
         nameEn: "", nameAr: "", descriptionEn: "", descriptionAr: "",
-        category: "clothing", basePrice: "", quantity: "", minOrder: "",
+        category: "clothing",
+        priceWholesaler: "", minOrderWholesaler: "", maxOrderWholesaler: "",
+        priceRetailer: "", minOrderRetailer: "", maxOrderRetailer: "",
+        basePrice: "", quantity: "", minOrder: "", maxOrder: "",
         image: null,
         tiers: [{ minQty: "", discount: 0 }]
       });
@@ -1294,20 +1321,63 @@ export default function Dashboard({ onNavigate }) {
                 </select>
               </div>
 
-              <div className="grid-2" style={{ gap: 10 }}>
-                <div className="form-group">
-                  <label className="form-label">{L("Base Price (EGP) *", "السعر الأساسي (ج.م) *")}</label>
-                  <input className="form-input" type="number" value={form.basePrice} onChange={(e) => set("basePrice", e.target.value)} placeholder="0" />
+              {/* Dynamic Prices and MOQs */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "10px 12px", background: "var(--bg-muted)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)", marginBottom: 12 }}>
+                <div style={{ fontWeight: 800, fontSize: "0.85rem", color: "var(--brand)" }}>
+                  {L("Pricing & Minimum Order Quantities (MOQ)", "تحديد الأسعار والحد الأدنى للطلب (MOQ)")}
                 </div>
-                <div className="form-group">
-                  <label className="form-label">{L("Quantity in Stock *", "الكمية المتاحة في المخزون *")}</label>
-                  <input className="form-input" type="number" value={form.quantity} onChange={(e) => set("quantity", e.target.value)} placeholder="0" />
+
+                {isSupplier && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    <div style={{ borderBottom: "1px dashed var(--border)", paddingBottom: 6 }}>
+                      <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--text-1)" }}>
+                        {L("1. Wholesaler Pricing & Order Limits", "1. تفاصيل أسعار وطلبات تاجر الجملة")}
+                      </span>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10 }}>
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontSize: "0.75rem" }}>{L("Wholesale Price (EGP) *", "السعر لتاجر الجملة (ج.م) *")}</label>
+                        <input className="form-input" type="number" value={form.priceWholesaler} onChange={(e) => set("priceWholesaler", e.target.value)} placeholder="0" required />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontSize: "0.75rem" }}>{L("Wholesale MOQ *", "أقل كمية لتاجر الجملة *")}</label>
+                        <input className="form-input" type="number" value={form.minOrderWholesaler} onChange={(e) => set("minOrderWholesaler", e.target.value)} placeholder="0" required />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontSize: "0.75rem" }}>{L("Wholesale Max Order", "أقصى كمية لتاجر الجملة")}</label>
+                        <input className="form-input" type="number" value={form.maxOrderWholesaler} onChange={(e) => set("maxOrderWholesaler", e.target.value)} placeholder={L("Optional", "اختياري")} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
+                  <div style={{ borderBottom: "1px dashed var(--border)", paddingBottom: 6 }}>
+                    <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--text-1)" }}>
+                      {isSupplier ? L("2. Retailer Pricing & Order Limits", "2. تفاصيل أسعار وطلبات تاجر التجزئة") : L("Retailer Pricing & Order Limits", "تفاصيل أسعار وطلبات تاجر التجزئة")}
+                    </span>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10 }}>
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontSize: "0.75rem" }}>{L("Retail Price (EGP) *", "السعر لتاجر التجزئة (ج.م) *")}</label>
+                      <input className="form-input" type="number" value={form.priceRetailer} onChange={(e) => set("priceRetailer", e.target.value)} placeholder="0" required />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontSize: "0.75rem" }}>{L("Retail MOQ *", "أقل كمية لتاجر التجزئة *")}</label>
+                      <input className="form-input" type="number" value={form.minOrderRetailer} onChange={(e) => set("minOrderRetailer", e.target.value)} placeholder="0" required />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontSize: "0.75rem" }}>{L("Retail Max Order", "أقصى كمية لتاجر التجزئة")}</label>
+                      <input className="form-input" type="number" value={form.maxOrderRetailer} onChange={(e) => set("maxOrderRetailer", e.target.value)} placeholder={L("Optional", "اختياري")} />
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div className="form-group">
-                <label className="form-label">{L("Minimum Order Quantity (MOQ) *", "الحد الأدنى للطلب (MOQ) *")}</label>
-                <input className="form-input" type="number" value={form.minOrder} onChange={(e) => set("minOrder", e.target.value)} placeholder="e.g. 50" />
+              {/* Quantity in Stock */}
+              <div className="form-group" style={{ marginBottom: 12 }}>
+                <label className="form-label">{L("Total Quantity in Stock *", "إجمالي الكمية المتاحة في المخزون *")}</label>
+                <input className="form-input" type="number" value={form.quantity} onChange={(e) => set("quantity", e.target.value)} placeholder="0" required />
               </div>
 
               <div className="grid-2" style={{ gap: 10 }}>

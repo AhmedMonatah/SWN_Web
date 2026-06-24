@@ -46,8 +46,17 @@ export default function Products({ onAuthClick }) {
     );
   }
 
+  // Resolve pricing and MOQ by role
+  const resolvedProducts = products.map(product => {
+    const role = currentUser?.role;
+    const price = role === "wholesaler" ? (product.priceWholesaler || product.basePrice) : (product.priceRetailer || product.basePrice);
+    const minOrder = role === "wholesaler" ? (product.minOrderWholesaler || product.minOrder) : (product.minOrderRetailer || product.minOrder);
+    const maxOrder = role === "wholesaler" ? (product.maxOrderWholesaler || product.maxOrder) : (product.maxOrderRetailer || product.maxOrder);
+    return { ...product, basePrice: price, minOrder: minOrder, maxOrder: maxOrder };
+  });
+
   // Filter & Sort Logic
-  let list = [...products];
+  let list = [...resolvedProducts];
 
   if (currentUser?.role === "admin") {
     // Admin sees all products
@@ -335,18 +344,60 @@ export default function Products({ onAuthClick }) {
               )}
 
               {/* Price Details */}
-              <div style={{ display: "flex", gap: 12, padding: "14px 16px", background: "var(--bg-surface)", borderRadius: "var(--radius-lg)", flexWrap: "wrap" }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: ".68rem", color: "var(--text-3)", fontWeight: 600, marginBottom: 2 }}>{L("Base Price", "السعر الأساسي")}</div>
-                  <div style={{ fontSize: "1.4rem", fontWeight: 800, color: "var(--text-1)", lineHeight: 1 }}>
-                    {detail.basePrice?.toLocaleString()} <span style={{ fontSize: ".75rem", color: "var(--text-3)", fontWeight: 400 }}>EGP / {L("unit", "قطعة")}</span>
+              {(!currentUser || currentUser.role === "admin") && detail.priceWholesaler && detail.priceRetailer ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "14px 16px", background: "var(--bg-surface)", borderRadius: "var(--radius-lg)", width: "100%" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <div style={{ fontSize: ".72rem", color: "var(--brand)", fontWeight: 700 }}>
+                        {L("Wholesaler Price", "سعر تاجر الجملة")}
+                      </div>
+                      <div style={{ fontSize: "1.2rem", fontWeight: 800, color: "var(--text-1)" }}>
+                        {detail.priceWholesaler.toLocaleString()} <span style={{ fontSize: ".7rem", color: "var(--text-3)", fontWeight: 400 }}>EGP</span>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: isRTL ? "left" : "right" }}>
+                      <div style={{ fontSize: ".68rem", color: "var(--text-3)" }}>{L("Wholesaler MOQ / Max", "حد أدنى / أقصى للجملة")}</div>
+                      <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "var(--text-1)" }}>
+                        {detail.minOrderWholesaler} {detail.maxOrderWholesaler ? `/ ${detail.maxOrderWholesaler}` : ""} {L("pcs", "قطعة")}
+                      </div>
+                    </div>
+                  </div>
+                  <hr style={{ border: "0", borderTop: "1px solid var(--border)", margin: "4px 0" }} />
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <div style={{ fontSize: ".72rem", color: "var(--success)", fontWeight: 700 }}>
+                        {L("Retailer Price", "سعر تاجر التجزئة")}
+                      </div>
+                      <div style={{ fontSize: "1.2rem", fontWeight: 800, color: "var(--text-1)" }}>
+                        {detail.priceRetailer.toLocaleString()} <span style={{ fontSize: ".7rem", color: "var(--text-3)", fontWeight: 400 }}>EGP</span>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: isRTL ? "left" : "right" }}>
+                      <div style={{ fontSize: ".68rem", color: "var(--text-3)" }}>{L("Retailer MOQ / Max", "حد أدنى / أقصى للتجزئة")}</div>
+                      <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "var(--text-1)" }}>
+                        {detail.minOrderRetailer} {detail.maxOrderRetailer ? `/ ${detail.maxOrderRetailer}` : ""} {L("pcs", "قطعة")}
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <div style={{ fontSize: ".68rem", color: "var(--text-3)", fontWeight: 600, marginBottom: 2 }}>{L("Minimum Order (MOQ)", "أقل طلب (MOQ)")}</div>
-                  <div style={{ fontWeight: 800, fontSize: "1rem", color: "var(--text-1)" }}>{detail.minOrder} {L("pcs", "قطعة")}</div>
+              ) : (
+                <div style={{ display: "flex", gap: 12, padding: "14px 16px", background: "var(--bg-surface)", borderRadius: "var(--radius-lg)", flexWrap: "wrap", width: "100%" }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: ".68rem", color: "var(--text-3)", fontWeight: 600, marginBottom: 2 }}>{L("Price", "السعر")}</div>
+                    <div style={{ fontSize: "1.4rem", fontWeight: 800, color: "var(--text-1)", lineHeight: 1 }}>
+                      {detail.basePrice?.toLocaleString()} <span style={{ fontSize: ".75rem", color: "var(--text-3)", fontWeight: 400 }}>EGP / {L("unit", "قطعة")}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: ".68rem", color: "var(--text-3)", fontWeight: 600, marginBottom: 2 }}>
+                      {detail.maxOrder ? L("MOQ / Max Limit", "حد أدنى / أقصى للطلب") : L("Minimum Order (MOQ)", "أقل طلب (MOQ)")}
+                    </div>
+                    <div style={{ fontWeight: 800, fontSize: "1rem", color: "var(--text-1)" }}>
+                      {detail.minOrder} {detail.maxOrder ? `/ ${detail.maxOrder}` : ""} {L("pcs", "قطعة")}
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Manufacturer / Seller */}
               <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: "var(--brand-50)", borderRadius: "var(--radius-md)", border: "1px solid var(--brand-100)" }}>
@@ -413,7 +464,14 @@ export default function Products({ onAuthClick }) {
                       type="number"
                       value={qty}
                       onChange={(e) => {
-                        const val = Math.max(detail.minOrder, Number(e.target.value));
+                        let val = Math.max(detail.minOrder, Number(e.target.value));
+                        if (detail.maxOrder && val > detail.maxOrder) {
+                          alert(isRTL 
+                            ? `الحد الأقصى للطلب هو ${detail.maxOrder} قطعة فقط.`
+                            : `Maximum order limit is ${detail.maxOrder} units.`
+                          );
+                          val = detail.maxOrder;
+                        }
                         if (val > detail.quantity) {
                           alert(isRTL 
                             ? `المخزون غير كافٍ! الكمية المتاحة في المخزون هي ${detail.quantity} قطعة فقط.`
@@ -428,6 +486,13 @@ export default function Products({ onAuthClick }) {
                     />
                     <button style={{ padding: "8px 12px", background: "var(--bg-surface)", border: "none", cursor: "pointer", color: "var(--text-2)" }} onClick={() => setQty((q) => {
                       const next = q + detail.minOrder;
+                      if (detail.maxOrder && next > detail.maxOrder) {
+                        alert(isRTL 
+                          ? `الحد الأقصى للطلب هو ${detail.maxOrder} قطعة فقط.`
+                          : `Maximum order limit is ${detail.maxOrder} units.`
+                        );
+                        return q;
+                      }
                       if (next > detail.quantity) {
                         alert(isRTL 
                           ? `المخزون غير كافٍ! الكمية المتاحة في المخزون هي ${detail.quantity} قطعة فقط.`
@@ -512,15 +577,32 @@ function ProductCard({ product, isRTL, L, canBuy, currentUser, onAuthClick, onOp
         )}
 
         {/* Pricing Info */}
-        <div style={{ marginTop: "auto", paddingTop: 8, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-          <div>
-            <div style={{ fontSize: "0.95rem", fontWeight: 800, color: "var(--brand)" }}>
-              {product.basePrice?.toLocaleString()} <span style={{ fontSize: "0.65rem", fontWeight: 400, color: "var(--text-3)" }}>EGP</span>
+        <div style={{ marginTop: "auto", paddingTop: 8, width: "100%" }}>
+          {(!currentUser || currentUser.role === "admin") && product.priceWholesaler && product.priceRetailer ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, width: "100%" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.78rem" }}>
+                <span style={{ color: "var(--text-3)" }}>{L("Wholesale:", "جملة:")}</span>
+                <span style={{ fontWeight: 700, color: "var(--brand)" }}>
+                  {product.priceWholesaler.toLocaleString()} EGP <span style={{ fontSize: "0.65rem", fontWeight: 400, color: "var(--text-3)" }}>({product.minOrderWholesaler}{product.maxOrderWholesaler ? `-${product.maxOrderWholesaler}` : ""})</span>
+                </span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.78rem" }}>
+                <span style={{ color: "var(--text-3)" }}>{L("Retail:", "تجزئة:")}</span>
+                <span style={{ fontWeight: 700, color: "var(--success)" }}>
+                  {product.priceRetailer.toLocaleString()} EGP <span style={{ fontSize: "0.65rem", fontWeight: 400, color: "var(--text-3)" }}>({product.minOrderRetailer}{product.maxOrderRetailer ? `-${product.maxOrderRetailer}` : ""})</span>
+                </span>
+              </div>
             </div>
-            <div style={{ fontSize: "0.7rem", color: "var(--text-3)", marginTop: 2 }}>
-              {L("Min Order:", "أقل طلب:")} {product.minOrder} {L("units", "وحدة")}
+          ) : (
+            <div>
+              <div style={{ fontSize: "0.95rem", fontWeight: 800, color: "var(--brand)" }}>
+                {product.basePrice?.toLocaleString()} <span style={{ fontSize: "0.65rem", fontWeight: 400, color: "var(--text-3)" }}>EGP</span>
+              </div>
+              <div style={{ fontSize: "0.7rem", color: "var(--text-3)", marginTop: 2 }}>
+                {L("Min/Max Order:", "حد أدنى/أقصى:")} {product.minOrder} {product.maxOrder ? `/ ${product.maxOrder}` : ""} {L("units", "وحدة")}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 

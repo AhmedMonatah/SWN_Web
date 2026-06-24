@@ -254,6 +254,15 @@ export function AppProvider({ children }) {
         return prev;
       }
 
+      // Max Order Quantity validation
+      if (product.maxOrder && newQty > product.maxOrder) {
+        alert(language === "ar"
+          ? `الحد الأقصى للطلب هو ${product.maxOrder} قطعة فقط لكل طلب.`
+          : `Maximum order limit is ${product.maxOrder} units per order.`
+        );
+        return prev;
+      }
+
       if (idx > -1) {
         const next = [...prev];
         next[idx] = { ...next[idx], quantity: newQty };
@@ -267,12 +276,26 @@ export function AppProvider({ children }) {
     if (qty <= 0) { removeFromCart(productId); return; }
     
     const prod = products.find(p => p.id === productId);
-    if (prod && qty > prod.quantity) {
-      alert(language === "ar"
-        ? `المخزون غير كافٍ! الكمية المتاحة في المخزون هي ${prod.quantity} قطعة فقط.`
-        : `Insufficient stock! Only ${prod.quantity} units are remaining in stock.`
-      );
-      return;
+    if (prod) {
+      // Resolve role-specific maxOrder
+      const role = currentUser?.role;
+      const maxOrderVal = role === "wholesaler" ? (prod.maxOrderWholesaler || prod.maxOrder) : (prod.maxOrderRetailer || prod.maxOrder);
+
+      if (qty > prod.quantity) {
+        alert(language === "ar"
+          ? `المخزون غير كافٍ! الكمية المتاحة في المخزون هي ${prod.quantity} قطعة فقط.`
+          : `Insufficient stock! Only ${prod.quantity} units are remaining in stock.`
+        );
+        return;
+      }
+
+      if (maxOrderVal && qty > maxOrderVal) {
+        alert(language === "ar"
+          ? `الحد الأقصى للطلب هو ${maxOrderVal} قطعة فقط لكل طلب.`
+          : `Maximum order limit is ${maxOrderVal} units per order.`
+        );
+        return;
+      }
     }
     
     setCart(prev => prev.map(i => i.product.id === productId ? { ...i, quantity: qty } : i));

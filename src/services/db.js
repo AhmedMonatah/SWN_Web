@@ -251,7 +251,7 @@ export const db = {
     if (idx === -1) return null;
     products[idx].status = "approved";
     if (products[idx].sellerRole === "supplier") {
-      products[idx].visibleTo = ["wholesaler", "admin"];
+      products[idx].visibleTo = ["wholesaler", "retailer", "admin"];
     } else if (products[idx].sellerRole === "wholesaler") {
       products[idx].visibleTo = ["retailer", "admin"];
     } else {
